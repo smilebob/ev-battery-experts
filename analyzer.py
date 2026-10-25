@@ -676,7 +676,7 @@ class SOHAnalyzer:
 
     <div class="section-card">
         <h2>2. Trajectoire du State of Health (SOH %)</h2>
-        <p class="section-desc">Pourcentage de santé résiduel rapporté à la capacité neuve initiale ($C_0$).</p>
+        <p class="section-desc">Pourcentage de santé résiduel rapporté à la capacité neuve initiale (C₀ = {{ "%.2f"|format(result.initial_capacity) }} kWh).</p>
         <div class="chart-container">{{ chart_soh_time_html|safe }}</div>
     </div>
 
