@@ -1,4 +1,4 @@
-#!/home/pierre/Projets/SOH/.venv/bin/python
+#!/usr/bin/env python3
 """
 CLI entry point for EV Battery SOH Analysis
 """

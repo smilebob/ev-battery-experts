@@ -3,7 +3,8 @@
 Un système complet et autonome d'analyse de télémétrie de recharge pour véhicules électriques. Il calcule avec précision la capacité utile résiduelle, le **State of Health (SOH)**, modélise la tendance avec régression locale pondérée et bande d'incertitude à 95%, et génère un **rapport d'expertise professionnel et interactif (HTML/PDF)**.
 
 Conçu pour fonctionner :
-* **En ligne de commande autonome** (CLI Python via `uv` ou `python3`).
+* **En ligne de commande autonome (CLI)** sur n'importe quel OS (Linux, macOS, Windows).
+* **Comme package Python installable** (`pip install .` ou `uv pip install -e .`).
 * **Dans Google Antigravity** via le skill et l'agent intégrés.
 * **Dans toute autre plateforme d'IA agentique** (Claude Code, Cursor, AutoGPT, OpenAI Assistants, etc.).
 
@@ -12,18 +13,43 @@ Conçu pour fonctionner :
 ## 📁 Structure du Projet
 
 ```text
-/home/pierre/Projets/SOH/
-├── main.py                  # Point d'entrée CLI
+ev-battery-experts/
+├── main.py                  # Point d'entrée CLI exécutable
 ├── analyzer.py              # Moteur statistique, régressions LOWESS, génération Plotly & Jinja2
-├── pyproject.toml           # Configuration projet et dépendances Python (uv / pip)
-├── rapport_soh.html         # Exemple de rapport généré
+├── pyproject.toml           # Configuration de packaging standard (pip / uv / hatchling)
 ├── skills/
 │   └── ev-battery-soh/
-│       └── SKILL.md         # Définition universelle de la compétence (Agent Skill)
+│       └── SKILL.md         # Spécification universelle de la compétence (Agent Skill)
 ├── agents/
 │   └── ev-battery-expert.md # Définition de l'Agent IA Expert Batterie
-└── .venv/                   # Environnement virtuel isolé (numpy, scipy, pandas, plotly, jinja2)
+└── README.md
 ```
+
+---
+
+## 📦 Installation & Prérequis
+
+Le projet ne nécessite que **Python 3.9 ou supérieur**.
+
+### Option A : Avec `uv` (Recommandé, ultra-rapide)
+```bash
+git clone https://github.com/smilebob/ev-battery-experts.git
+cd ev-battery-experts
+uv venv
+source .venv/bin/activate  # Sur Windows : .venv\Scripts\activate
+uv pip install -e .
+```
+
+### Option B : Avec `pip` standard
+```bash
+git clone https://github.com/smilebob/ev-battery-experts.git
+cd ev-battery-experts
+python3 -m venv .venv
+source .venv/bin/activate  # Sur Windows : .venv\Scripts\activate
+pip install -e .
+```
+
+Une fois installé, la commande `ev-battery-soh` est disponible partout dans votre terminal.
 
 ---
 
@@ -33,15 +59,16 @@ Conçu pour fonctionner :
 L'outil détecte automatiquement les colonnes de date, énergie, SoC et odomètre :
 
 ```bash
-cd /home/pierre/Projets/SOH
-.venv/bin/python main.py /chemin/vers/fichier.csv -o mon_rapport_soh.html
+ev-battery-soh /chemin/vers/fichier.csv -o mon_rapport_soh.html
+# Ou directement sans installation :
+python3 main.py /chemin/vers/fichier.csv -o mon_rapport_soh.html
 ```
 
 ### 2. Spécification d'un mapping personnalisé
 Si le CSV possède des entêtes inhabituels :
 
 ```bash
-.venv/bin/python main.py donnees.csv \
+ev-battery-soh donnees.csv \
   --mapping date=Horodatage energy_added=Kwh_Charges soc_start=Niveau_Debut soc_end=Niveau_Fin odometer=Compteur_Km \
   -o rapport.html
 ```
@@ -50,7 +77,7 @@ Si le CSV possède des entêtes inhabituels :
 Par défaut, seules les charges avec une variation de batterie $\ge 40\,\%$ sont retenues (pour éliminer l'erreur d'arrondi numérique du BMS) :
 
 ```bash
-.venv/bin/python main.py donnees.csv --min-delta 30 -o rapport.html
+ev-battery-soh donnees.csv --min-delta 30 -o rapport.html
 ```
 
 ---
@@ -73,5 +100,5 @@ Le rapport HTML généré propose un rendu moderne et officiel :
 
 ## 🤖 Intégration dans les plateformes d'IA Agentique
 
-* **Antigravity** : La compétence est documentée dans [`skills/ev-battery-soh/SKILL.md`](skills/ev-battery-soh/SKILL.md). L'agent peut invoquer directement le script CLI.
+* **Google Antigravity** : La compétence est documentée dans [`skills/ev-battery-soh/SKILL.md`](skills/ev-battery-soh/SKILL.md). L'agent peut invoquer directement la commande CLI ou le script Python.
 * **Claude Code / Cursor / Assistants OpenAI** : Il suffit de pointer l'assistant vers `skills/ev-battery-soh/SKILL.md` ou d'inclure le fichier dans le contexte système pour lui donner l'autonomie d'exécuter l'analyse et d'interpréter les résultats.

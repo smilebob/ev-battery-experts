@@ -7,15 +7,22 @@ description: Analyse télémétrique avancée de State of Health (SOH) et dégra
 
 Cette compétence permet à tout agent IA (Antigravity, Claude Code, Cursor, AutoGPT, OpenAI Swarm/Assistants) d'analyser l'historique de recharge d'un véhicule électrique et d'éditer un rapport d'expertise officiel de dégradation de batterie.
 
-## Emplacement de l'outil
-Le moteur d'analyse se trouve dans `/home/pierre/Projets/SOH` :
-* Script principal : `main.py`
-* Moteur statistique : `analyzer.py`
-* Environnement Python : `/home/pierre/Projets/SOH/.venv/bin/python`
+---
+
+## 🚀 Utilisation Universelle par l'Agent
+
+Si le projet est installé ou présent dans le dépôt :
+```bash
+# Option 1 : Via la commande globale (si installée via pip install -e .)
+ev-battery-soh "/chemin/vers/fichier.csv" -o "/chemin/vers/rapport_soh.html"
+
+# Option 2 : Via le script autonome du dépôt
+python3 main.py "/chemin/vers/fichier.csv" -o "/chemin/vers/rapport_soh.html"
+```
 
 ---
 
-## Fonctionnalités Principales
+## 📊 Fonctionnalités Principales
 
 1. **Détection automatique et tolérante des colonnes** :
    Gère automatiquement les exports issus de :
@@ -39,26 +46,18 @@ Le moteur d'analyse se trouve dans `/home/pierre/Projets/SOH` :
 
 ---
 
-## Instructions d'Exécution pour l'Agent
+## ⚙️ Options CLI disponibles
 
-Pour exécuter une analyse sur un fichier CSV fourni par l'utilisateur :
-
-```bash
-cd /home/pierre/Projets/SOH
-.venv/bin/python main.py "/chemin/vers/fichier.csv" -o "/chemin/vers/rapport_soh.html"
-```
-
-### Options CLI disponibles :
 * `-o`, `--output` : Chemin du fichier HTML de sortie (par défaut : `rapport_soh.html`).
 * `--min-delta` : Seuil minimal de variation de batterie $\Delta\%$ pour qualifier une session (défaut : `40.0`).
 * `-m`, `--mapping` : Spécification manuelle des colonnes si les noms sont exotiques :
   ```bash
-  .venv/bin/python main.py data.csv -m date=horodatage energy_added=kwh_recus soc_start=batterie_debut soc_end=batterie_fin odometer=compteur
+  ev-battery-soh data.csv -m date=horodatage energy_added=kwh_recus soc_start=batterie_debut soc_end=batterie_fin odometer=compteur
   ```
 
 ---
 
-## Interprétation des Résultats pour l'Utilisateur
+## 💡 Interprétation des Résultats pour l'Utilisateur
 Quand l'agent présente les résultats, il doit structurer sa réponse en 4 points :
 1. **Capacité initiale vs Capacité actuelle** : en kWh avec la marge d'erreur à 95%.
 2. **SOH actuel (%)** : avec son intervalle de confiance.
