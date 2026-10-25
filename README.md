@@ -64,7 +64,14 @@ uv pip install -e .
 
 ### 1. Automatic Column Detection (TeslaMate, Tronity, ABRP, etc.)
 ```bash
+# English report (default)
 ev-battery-soh /path/to/charging_logs.csv -o battery_report.html
+
+# French report (Français)
+ev-battery-soh /path/to/charging_logs.csv --lang fr -o rapport_fr.html
+
+# Spanish report (Español)
+ev-battery-soh /path/to/charging_logs.csv --lang es -o informe_es.html
 ```
 
 ### 2. Custom Column Mapping

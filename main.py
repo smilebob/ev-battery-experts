@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 CLI entry point for EV Battery SOH Analysis
+Supports multilingual reporting: English (--lang en), French (--lang fr), Spanish (--lang es).
 """
 
 import argparse
 import sys
 from pathlib import Path
 from analyzer import SOHAnalyzer
+from i18n import TRANSLATIONS
 
 
 def parse_mapping(mapping_args):
@@ -37,6 +39,14 @@ def main():
         help="Path for output HTML report (default: battery_soh_report.html)",
     )
     parser.add_argument(
+        "--lang",
+        "-l",
+        type=str,
+        default="en",
+        choices=["en", "fr", "es"],
+        help="Report language: en (English), fr (French), es (Spanish). Default: en",
+    )
+    parser.add_argument(
         "--min-delta",
         type=float,
         default=40.0,
@@ -58,7 +68,7 @@ def main():
     custom_mapping = parse_mapping(args.mapping)
 
     print(f"Loading and detecting columns from '{args.csv_path}'...")
-    analyzer = SOHAnalyzer(custom_mapping=custom_mapping, min_delta_soc=args.min_delta)
+    analyzer = SOHAnalyzer(custom_mapping=custom_mapping, min_delta_soc=args.min_delta, lang=args.lang)
 
     try:
         clean_df = analyzer.load_data(args.csv_path)
@@ -68,7 +78,7 @@ def main():
         result = analyzer.analyze(clean_df)
 
         print("\n" + "=" * 55)
-        print("          BATTERY SOH ASSESSMENT RESULTS          ")
+        print(f"       BATTERY SOH ASSESSMENT RESULTS ({args.lang.upper()})       ")
         print("=" * 55)
         print(f"Period analyzed      : {result.date_min.strftime('%Y-%m-%d')} -> {result.date_max.strftime('%Y-%m-%d')}")
         print(f"Qualified sessions   : {result.qualified_charges} (threshold: Δ% ≥ {args.min_delta}%)")
@@ -80,7 +90,7 @@ def main():
         print(f"Total degradation    : {result.total_degradation_pct:.2f}% ({result.initial_capacity - result.current_capacity:.2f} kWh lost)")
         print("=" * 55 + "\n")
 
-        print("Generating interactive professional HTML report...")
+        print(f"Generating interactive professional HTML report in '{args.lang}'...")
         analyzer.generate_html_report(result, args.output)
         print(f"-> Report ready: {args.output.resolve()}\n")
 

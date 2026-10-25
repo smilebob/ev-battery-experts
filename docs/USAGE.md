@@ -13,9 +13,17 @@ The primary command is `ev-battery-soh` (or `python3 main.py`).
 ev-battery-soh <path_to_file.csv> [options]
 ```
 
-### Example:
+### Multi-language Reports (`--lang` or `-l`):
+Generate executive reports in **English**, **French**, or **Spanish**:
 ```bash
-ev-battery-soh charging_logs.csv -o battery_assessment.html
+# English (Default)
+ev-battery-soh charges.csv --lang en -o report_en.html
+
+# French (Français)
+ev-battery-soh charges.csv --lang fr -o rapport_fr.html
+
+# Spanish (Español)
+ev-battery-soh charges.csv --lang es -o informe_es.html
 ```
 This command automatically:
 1. Reads `charging_logs.csv`.
