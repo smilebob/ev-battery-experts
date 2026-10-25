@@ -1,116 +1,106 @@
 # 🔋 EV Battery SOH Analyzer & AI Agent
 
-Un système complet et autonome d'analyse de télémétrie de recharge pour véhicules électriques. Il calcule avec précision la capacité utile résiduelle, le **State of Health (SOH)**, modélise la tendance avec régression locale pondérée et bande d'incertitude à 95%, et génère un **rapport d'expertise professionnel et interactif (HTML/PDF)**.
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 
-Conçu pour fonctionner :
-* **En ligne de commande autonome (CLI)** sur n'importe quel OS (Linux, macOS, Windows).
-* **Comme package Python installable** (`pip install .` ou `uv pip install -e .`).
-* **Dans Google Antigravity** via le skill et l'agent intégrés.
-* **Dans toute autre plateforme d'IA agentique** (Claude Code, Cursor, AutoGPT, OpenAI Assistants, etc.).
+An advanced, portable, telemetric battery capacity and **State of Health (SOH)** analyzer for electric vehicles. It estimates usable capacity trajectories, applies Gaussian local weighted regression with 95% uncertainty confidence bands, and generates an **executive-grade interactive HTML/PDF assessment report**.
+
+Works seamlessly:
+* **As a standalone CLI utility** on Linux, macOS, and Windows.
+* **As an installable Python package** (`pip install .` or `uv pip install -e .`).
+* **Within Google Antigravity** via its built-in skill and agent persona.
+* **Within any AI Agent framework** (Claude Code, Cursor, AutoGPT, OpenAI Assistants).
 
 ---
 
-## 📁 Structure du Projet
+## 📁 Repository Structure
 
 ```text
 ev-battery-experts/
-├── main.py                  # Point d'entrée CLI exécutable
-├── analyzer.py              # Moteur statistique, régressions LOWESS, génération Plotly & Jinja2
-├── pyproject.toml           # Configuration de packaging standard (pip / uv / hatchling)
-├── docs/                    # 📚 Documentation détaillée
-│   ├── INSTALLATION.md      # Manuel d'installation (Linux, macOS, Windows, uv, pip)
-│   ├── USAGE.md             # Manuel d'utilisation, options CLI & formats CSV
-│   └── METHODOLOGY.md       # Méthodologie scientifique & formules mathématiques
+├── main.py                  # CLI executable entry point
+├── analyzer.py              # Statistical engine, LOWESS regression, Plotly & Jinja2 report generator
+├── pyproject.toml           # Standard PEP 517/621 packaging configuration
+├── LICENSE                  # BSD 3-Clause License
+├── docs/                    # 📚 Documentation
+│   ├── INSTALLATION.md      # Installation guide (Linux, macOS, Windows, uv, pip)
+│   ├── USAGE.md             # Practical guide, CLI options & CSV formats
+│   └── METHODOLOGY.md       # Physical principles & mathematical modeling
 ├── skills/
 │   └── ev-battery-soh/
-│       └── SKILL.md         # Spécification universelle de la compétence (Agent Skill)
+│       └── SKILL.md         # Universal Agent Skill definition
 ├── agents/
-│   └── ev-battery-expert.md # Définition de l'Agent IA Expert Batterie
+│   └── ev-battery-expert.md # AI Agent Persona specification
 └── README.md
 ```
 
 ---
 
-## 📚 Documentation Complète
+## 📚 Documentation
 
-* **[Guide d'Installation](docs/INSTALLATION.md)** : Installation pas à pas sur Linux, macOS et Windows (via `pip` ou `uv`).
-* **[Manuel d'Utilisation](docs/USAGE.md)** : Guide pratique, syntaxe CLI, mapping personnalisé et export PDF.
-* **[Méthodologie Scientifique](docs/METHODOLOGY.md)** : Formules mathématiques, traitement du bruit, régressions locales gaussiennes et calcul des intervalles de confiance à 95%.
+* **[Installation Guide](docs/INSTALLATION.md)**: Detailed step-by-step setup on Linux, macOS, and Windows.
+* **[User Manual](docs/USAGE.md)**: CLI syntax, column mapping options, supported CSV formats, and PDF export.
+* **[Scientific Methodology](docs/METHODOLOGY.md)**: Physical telemetry principles, discretization noise handling, and statistical confidence intervals.
 
 ---
 
-## 📦 Installation & Prérequis
+## 📦 Quick Installation
 
-Le projet ne nécessite que **Python 3.9 ou supérieur**.
+Requires **Python 3.9 or higher**.
 
-### Option A : Avec `uv` (Recommandé, ultra-rapide)
 ```bash
 git clone https://github.com/smilebob/ev-battery-experts.git
 cd ev-battery-experts
-uv venv
-source .venv/bin/activate  # Sur Windows : .venv\Scripts\activate
+
+# Using standard pip:
+pip install -e .
+
+# Or using uv:
 uv pip install -e .
 ```
 
-### Option B : Avec `pip` standard
-```bash
-git clone https://github.com/smilebob/ev-battery-experts.git
-cd ev-battery-experts
-python3 -m venv .venv
-source .venv/bin/activate  # Sur Windows : .venv\Scripts\activate
-pip install -e .
-```
-
-Une fois installé, la commande `ev-battery-soh` est disponible partout dans votre terminal.
-
 ---
 
-## 🚀 Utilisation en Ligne de Commande (CLI)
+## 🚀 Quick Usage
 
-### 1. Analyse automatique (TeslaMate, Tronity, ABRP, etc.)
-L'outil détecte automatiquement les colonnes de date, énergie, SoC et odomètre :
-
+### 1. Automatic Column Detection (TeslaMate, Tronity, ABRP, etc.)
 ```bash
-ev-battery-soh /chemin/vers/fichier.csv -o mon_rapport_soh.html
-# Ou directement sans installation :
-python3 main.py /chemin/vers/fichier.csv -o mon_rapport_soh.html
+ev-battery-soh /path/to/charging_logs.csv -o battery_report.html
 ```
 
-### 2. Spécification d'un mapping personnalisé
-Si le CSV possède des entêtes inhabituels :
-
+### 2. Custom Column Mapping
+For CSV files with non-standard column headers:
 ```bash
-ev-battery-soh donnees.csv \
-  --mapping date=Horodatage energy_added=Kwh_Charges soc_start=Niveau_Debut soc_end=Niveau_Fin odometer=Compteur_Km \
-  -o rapport.html
+ev-battery-soh custom_export.csv \
+  --mapping date=Timestamp energy_added=NetKwh soc_start=InitialSoC soc_end=FinalSoC odometer=MileageKm \
+  -o battery_report.html
 ```
 
-### 3. Ajustement du seuil de qualification
-Par défaut, seules les charges avec une variation de batterie $\ge 40\,\%$ sont retenues (pour éliminer l'erreur d'arrondi numérique du BMS) :
-
+### 3. Adjusting Qualification Threshold
 ```bash
-ev-battery-soh donnees.csv --min-delta 30 -o rapport.html
+ev-battery-soh charges.csv --min-delta 30 -o battery_report.html
 ```
 
 ---
 
-## 📊 Contenu du Rapport Produit
+## 📊 Report Contents
 
-Le rapport HTML généré propose un rendu moderne et officiel :
-1. **Cartouche d'expertise & KPIs clés** :
-   * State of Health (SOH) actuel avec intervalle de confiance à 95% ($\pm X\,\%$).
-   * Capacité utile actuelle avec incertitude ($\pm X\text{ kWh}$).
-   * Capacité initiale de référence $C_0$.
-   * Taux de dégradation global.
-2. **Courbe 1 : Évolution de la capacité utile dans le temps (kWh)** avec bande d'incertitude (régression locale gaussienne LOWESS).
-3. **Courbe 2 : Évolution du State of Health (SOH %)** avec bande de confiance.
-4. **Courbe 3 : Dégradation en fonction du kilométrage (odomètre)**.
-5. **Tableau trimestriel certifié** : Médiane, écart-type et indice de fiabilité de 1 à 5 étoiles (★).
-6. **Impression PDF native** : Rendu optimisé lors de l'impression (`Ctrl+P` ou export PDF du navigateur).
+The generated interactive HTML report provides:
+1. **Executive Scorecard**: Current SOH with 95% margin of error ($\pm X\%$), current usable capacity ($\pm X\text{ kWh}$), baseline capacity $C_0$, and cumulative loss.
+2. **Chart 1: Usable Capacity Trajectory (kWh)** with 95% confidence interval band.
+3. **Chart 2: State of Health (SOH %)** over time.
+4. **Chart 3: Degradation vs Odometer Mileage**.
+5. **Certified Quarterly Breakdown Table**: Median, standard deviation, and reliability star ratings (★).
+6. **Native Print-to-PDF**: Pre-styled for direct executive PDF exports via your browser (`Ctrl+P` / `Cmd+P`).
 
 ---
 
-## 🤖 Intégration dans les plateformes d'IA Agentique
+## 🤖 AI Agent Integration
 
-* **Google Antigravity** : La compétence est documentée dans [`skills/ev-battery-soh/SKILL.md`](skills/ev-battery-soh/SKILL.md). L'agent peut invoquer directement la commande CLI ou le script Python.
-* **Claude Code / Cursor / Assistants OpenAI** : Il suffit de pointer l'assistant vers `skills/ev-battery-soh/SKILL.md` ou d'inclure le fichier dans le contexte système pour lui donner l'autonomie d'exécuter l'analyse et d'interpréter les résultats.
+* **Google Antigravity**: The skill is registered under [`skills/ev-battery-soh/SKILL.md`](skills/ev-battery-soh/SKILL.md) and can be invoked directly by Antigravity agents.
+* **Claude Code / Cursor / OpenAI**: Point the agent to `skills/ev-battery-soh/SKILL.md` to grant autonomous battery telemetry assessment capabilities.
+
+---
+
+## 📄 License
+
+This project is licensed under the **BSD 3-Clause License** - see the [LICENSE](LICENSE) file for details.

@@ -26,66 +26,66 @@ def parse_mapping(mapping_args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyse de State of Health (SOH) et dégradation de batterie pour véhicule électrique"
+        description="Electric Vehicle Battery State of Health (SOH) and Capacity Degradation Analyzer"
     )
-    parser.add_argument("csv_path", type=Path, help="Chemin vers le fichier CSV de sessions de recharge")
+    parser.add_argument("csv_path", type=Path, help="Path to the charging telemetry CSV file")
     parser.add_argument(
         "--output",
         "-o",
         type=Path,
-        default=Path("rapport_soh.html"),
-        help="Chemin de sortie du rapport HTML (par défaut : rapport_soh.html)",
+        default=Path("battery_soh_report.html"),
+        help="Path for output HTML report (default: battery_soh_report.html)",
     )
     parser.add_argument(
         "--min-delta",
         type=float,
         default=40.0,
-        help="Variation minimale de pourcentage de charge pour qualifier une session (par defaut : 40)",
+        help="Minimum battery %% variation to qualify a charge session (default: 40)",
     )
     parser.add_argument(
         "--mapping",
         "-m",
         nargs="*",
-        help="Mapping personnalisé de colonnes au format clé=valeur (ex: date=Date energy_added='Energy added')",
+        help="Custom column mapping in key=value format (e.g., date=Date energy_added='Energy added')",
     )
 
     args = parser.parse_args()
 
     if not args.csv_path.exists():
-        print(f"Erreur : Le fichier '{args.csv_path}' n'existe pas.", file=sys.stderr)
+        print(f"Error: File '{args.csv_path}' does not exist.", file=sys.stderr)
         sys.exit(1)
 
     custom_mapping = parse_mapping(args.mapping)
 
-    print(f"Chargement et détection des colonnes depuis '{args.csv_path}'...")
+    print(f"Loading and detecting columns from '{args.csv_path}'...")
     analyzer = SOHAnalyzer(custom_mapping=custom_mapping, min_delta_soc=args.min_delta)
 
     try:
         clean_df = analyzer.load_data(args.csv_path)
-        print(f"-> {len(clean_df)} sessions valides extraites.")
+        print(f"-> {len(clean_df)} valid charge sessions extracted.")
 
-        print("Calcul de la dégradation et régression statistique...")
+        print("Computing battery degradation and local weighted statistical regression...")
         result = analyzer.analyze(clean_df)
 
         print("\n" + "=" * 55)
-        print("          RÉSULTATS DE L'EXPERTISE SOH          ")
+        print("          BATTERY SOH ASSESSMENT RESULTS          ")
         print("=" * 55)
-        print(f"Période analysée     : {result.date_min.strftime('%d/%m/%Y')} -> {result.date_max.strftime('%d/%m/%Y')}")
-        print(f"Sessions qualifiées  : {result.qualified_charges} (seuil: Δ% ≥ {args.min_delta}%)")
+        print(f"Period analyzed      : {result.date_min.strftime('%Y-%m-%d')} -> {result.date_max.strftime('%Y-%m-%d')}")
+        print(f"Qualified sessions   : {result.qualified_charges} (threshold: Δ% ≥ {args.min_delta}%)")
         if result.odometer_max > 0:
-            print(f"Kilométrage total    : {result.odometer_max:,.0f} km")
-        print(f"Capacité initiale C0 : {result.initial_capacity:.2f} kWh")
-        print(f"Capacité actuelle    : {result.current_capacity:.2f} ± {result.current_capacity_err:.2f} kWh (IC 95%)")
-        print(f"SOH Actuel           : {result.current_soh:.2f}% ± {result.current_soh_err:.2f}%")
-        print(f"Perte de capacité    : {result.total_degradation_pct:.2f}% ({result.initial_capacity - result.current_capacity:.2f} kWh)")
+            print(f"Total mileage        : {result.odometer_max:,.0f} km")
+        print(f"Baseline capacity C0 : {result.initial_capacity:.2f} kWh")
+        print(f"Current capacity     : {result.current_capacity:.2f} ± {result.current_capacity_err:.2f} kWh (95% CI)")
+        print(f"Current SOH          : {result.current_soh:.2f}% ± {result.current_soh_err:.2f}%")
+        print(f"Total degradation    : {result.total_degradation_pct:.2f}% ({result.initial_capacity - result.current_capacity:.2f} kWh lost)")
         print("=" * 55 + "\n")
 
-        print(f"Génération du rapport professionnel avec visualisations interactives...")
+        print("Generating interactive professional HTML report...")
         analyzer.generate_html_report(result, args.output)
-        print(f"-> Rapport prêt : {args.output.resolve()}\n")
+        print(f"-> Report ready: {args.output.resolve()}\n")
 
     except Exception as e:
-        print(f"Erreur lors de l'analyse : {e}", file=sys.stderr)
+        print(f"Error during analysis: {e}", file=sys.stderr)
         sys.exit(1)
 
 

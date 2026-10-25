@@ -1,70 +1,70 @@
-# 🔬 Méthodologie Scientifique & Modélisation Mathématique
+# 🔬 Scientific Methodology & Mathematical Modeling
 
-Ce document détaille les fondements physiques et statistiques utilisés par **EV Battery SOH Analyzer** pour estimer la dégradation de capacité et le State of Health (SOH).
+This document details the physical principles and statistical methods implemented by **EV Battery SOH Analyzer** to compute capacity degradation and State of Health (SOH).
 
 ---
 
-## 1. Principe Physique de la Mesure Télémétrique
+## 1. Physical Principle of Charging Telemetry
 
-Contrairement aux tests de décharge complets en laboratoire sous banc d'essai (très coûteux et immobilisants), la méthode par télémétrie de recharge exploite les données en conditions réelles de roulage.
+Unlike intrusive and costly bench testing, telemetric charging session analysis leverages real-world operational logs.
 
-### Distinction cruciale : Énergie stockée vs Énergie consommée
-* **`Energy used` (Énergie au compteur)** : Inclut le rendement du chargeur AC/DC (typiquement 85-95%), l'effet Joule dans le câble, et la climatisation/chauffage de la batterie pendant la charge. **Elle ne doit pas être utilisée pour calculer la capacité.**
-* **`Energy added` (Énergie dans le pack)** : Représente la quantité nette de coulombs/énergie effectivement acceptée par la chimie de la batterie.
+### Key Distinction: Net Energy Added vs Gross AC Energy Used
+* **`Energy used` (Wall meter energy)**: Accounts for on-board charger efficiency (85–95%), cable Joule heating, and thermal preconditioning (heating/cooling). **It must never be used to calculate cell capacity.**
+* **`Energy added` (Pack intake energy)**: The actual net energy stored electrochemically in the battery cells.
 
-Pour chaque recharge $i$ :
+For each charging session $i$:
 $$\Delta\%_i = \%_{\text{End}, i} - \%_{\text{Start}, i}$$
 $$C_i = \frac{E_{\text{added}, i}}{\Delta\%_i} \times 100$$
 
-Où $C_i$ est la capacité totale apparente du pack lors de la session $i$ (en kWh).
+Where $C_i$ is the apparent total battery pack capacity during session $i$ (in kWh).
 
 ---
 
-## 2. Traitement du Bruit Numérique & Échantillonnage
+## 2. Digital Discretization Noise & Thresholding
 
-Dans les exports grand public (ex. TeslaMate, Tronity), les états de charge (`% Start`, `% End`) sont des **entiers arrondis** ($80\,\%$, $81\,\%$, etc.).
+Consumer EV telemetry loggers typically store State of Charge as **integer values** ($80\%$, $81\%$, etc.).
 
-### Analyse d'erreur d'arrondi :
-Soit une session mesurée de $50\,\%$ à $55\,\%$ ($\Delta\% = 5\,\%$).
-* Les vraies valeurs peuvent être $50{,}4\,\%$ et $54{,}6\,\%$, soit $\Delta\%_{\text{réel}} = 4{,}2\,\%$.
-* L'erreur relative est alors de :
-  $$\text{Erreur} = \frac{5 - 4{,}2}{4{,}2} \approx 19\,\%$$
-* En revanche, pour une session où $\Delta\% \ge 40\,\%$, l'erreur maximale d'arrondi sur les bornes est au maximum de :
-  $$\frac{\pm 0{,}5 + \pm 0{,}5}{40} = \frac{\pm 1}{40} = \pm 2{,}5\,\%$$
-  *(et inférieure à $\pm 1\,\%$ sur des charges de 80%)*.
+### Discretization Error Analysis:
+Consider a shallow charge from $50\%$ to $55\%$ ($\Delta\% = 5\%$):
+* True unrounded values could be $50.4\%$ and $54.6\%$, meaning $\Delta\%_{\text{true}} = 4.2\%$.
+* The relative error in capacity estimation is:
+  $$\text{Relative Error} = \frac{5 - 4.2}{4.2} \approx 19\%$$
+* Conversely, on a charge with $\Delta\% \ge 40\%$, the boundary discretization error is bounded by:
+  $$\frac{\pm 0.5 + \pm 0.5}{40} = \frac{\pm 1}{40} = \pm 2.5\%$$
+  *(and falls below $\pm 1\%$ on deep $80\%$ charges)*.
 
-**Règle appliquée :** Seules les sessions avec $\Delta\% \ge 40\,\%$ sont admises dans la modélisation statistique.
+**Applied Rule:** Only sessions with $\Delta\% \ge 40\%$ are admitted into the statistical regression model.
 
 ---
 
-## 3. Régression Locale Pondérée (LOWESS) & Marge d'Erreur
+## 3. Gaussian Kernel Local Regression (LOWESS) & Error Bounds
 
-La dégradation d'une batterie ne suit pas une droite simple. Elle présente souvent :
-1. Une chute plus rapide dans les premiers 10 000 à 20 000 km (formation de la couche SEI).
-2. Un plateau ou des ondulations liées au recalibrage périodique du BMS.
-3. Une décroissance très lente par la suite.
+EV battery degradation does not follow a simple linear path. It exhibits:
+1. An initial steeper slope during the first 10,000 to 20,000 km (Solid Electrolyte Interphase - SEI layer stabilization).
+2. Plateaus and apparent capacity recovery phases associated with BMS high-voltage recalibrations.
+3. A very gradual, steady degradation phase thereafter.
 
-Pour capturer cette dynamique sans biais de modèle, nous utilisons une **régression polynomiale locale à noyau gaussien** :
+To capture these dynamics without imposing rigid model constraints, we apply **Gaussian local polynomial regression**:
 
-Pour chaque point d'évaluation $t_0$, nous minimisons la somme pondérée des carrés :
+For each target evaluation date $t_0$, we solve:
 $$\min_{\beta_0, \beta_1} \sum_{i=1}^n w_i(t_0) \left( C_i - (\beta_0 + \beta_1 (t_i - t_0)) \right)^2$$
 
-Avec le poids gaussien :
+Where weights follow a Gaussian kernel:
 $$w_i(t_0) = \exp\left( -\frac{1}{2}\left(\frac{t_i - t_0}{h}\right)^2 \right)$$
-Où $h$ est la largeur de bande temporelle adaptative (bandwidth).
+With an adaptive bandwidth parameter $h$.
 
-### Intervalle de Confiance à 95% (Marge d'erreur) :
-Pour chaque point estimé $\hat{C}(t_0) = \hat{\beta}_0$, la variance locale pondérée des résidus est calculée :
+### 95% Confidence Interval (Error Margin):
+For each fitted estimate $\hat{C}(t_0) = \hat{\beta}_0$, the local weighted residual variance is computed:
 $$s^2(t_0) = \frac{\sum w_i (C_i - \hat{C}_i)^2}{\sum w_i \left(1 - \frac{1}{\text{eff\_n}}\right)}$$
-$$\text{Marge d'erreur (IC 95\%)} = \pm 1{,}96 \times s(t_0)$$
+$$\text{Margin of Error (95\% CI)} = \pm 1.96 \times s(t_0)$$
 
-Cette bande d'incertitude reflète les variations saisonnières de température, la dispersion des mesures et l'incertitude statistique intrinsèque.
+This confidence band captures seasonal temperature shifts, measurement dispersion, and statistical variance.
 
 ---
 
-## 4. Calcul du State of Health (SOH)
+## 4. State of Health (SOH) Computation
 
-La capacité initiale de référence $C_0$ est déterminée par la médiane des sessions de recharge initiales (véhicule neuf, premiers 10% des données ou 5 000 premiers km).
+The baseline capacity when new ($C_0$) is determined by the median capacity of initial sessions (first 10% of qualifying data or first 5,000 km).
 
 $$\text{SOH}(t) = \frac{\hat{C}(t)}{C_0} \times 100$$
-$$\text{Incertitude SOH}(t) = \frac{1{,}96 \times s(t)}{C_0} \times 100$$
+$$\text{SOH Uncertainty}(t) = \frac{1.96 \times s(t)}{C_0} \times 100$$

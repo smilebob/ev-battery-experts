@@ -1,65 +1,65 @@
 ---
 name: ev-battery-soh
-description: Analyse télémétrique avancée de State of Health (SOH) et dégradation de capacité de batterie pour véhicule électrique (Tesla, Tronity, ABRP ou tout export CSV de recharge). Calcule la capacité utile résiduelle, la régression statistique locale avec bande d'incertitude à 95%, la synthèse trimestrielle avec indice de fiabilité et génère un rapport HTML interactif et imprimable haut de gamme.
+description: Advanced telemetric State of Health (SOH) and battery capacity degradation analyzer for electric vehicles (Tesla, Tronity, ABRP, or generic charging CSV exports). Calculates residual usable capacity, local statistical regression with 95% uncertainty band, quarterly breakdown with reliability ratings, and generates executive-grade interactive HTML/PDF reports.
 ---
 
 # EV Battery SOH Analysis Skill
 
-Cette compétence permet à tout agent IA (Antigravity, Claude Code, Cursor, AutoGPT, OpenAI Swarm/Assistants) d'analyser l'historique de recharge d'un véhicule électrique et d'éditer un rapport d'expertise officiel de dégradation de batterie.
+This skill allows any AI Agent (Google Antigravity, Claude Code, Cursor, AutoGPT, OpenAI Swarm/Assistants) to analyze EV charging session telemetric logs and produce a scientific, executive-grade battery health assessment report.
 
 ---
 
-## 🚀 Utilisation Universelle par l'Agent
+## 🚀 Universal Execution
 
-Si le projet est installé ou présent dans le dépôt :
+Run the tool using the global command or the standalone Python entry point:
 ```bash
-# Option 1 : Via la commande globale (si installée via pip install -e .)
-ev-battery-soh "/chemin/vers/fichier.csv" -o "/chemin/vers/rapport_soh.html"
+# Option 1: Via global CLI command (if installed via pip install -e .)
+ev-battery-soh "/path/to/charges.csv" -o "/path/to/soh_report.html"
 
-# Option 2 : Via le script autonome du dépôt
-python3 main.py "/chemin/vers/fichier.csv" -o "/chemin/vers/rapport_soh.html"
+# Option 2: Via standalone script
+python3 main.py "/path/to/charges.csv" -o "/path/to/soh_report.html"
 ```
 
 ---
 
-## 📊 Fonctionnalités Principales
+## 📊 Core Features
 
-1. **Détection automatique et tolérante des colonnes** :
-   Gère automatiquement les exports issus de :
+1. **Automatic & Fault-Tolerant Column Detection**:
+   Seamlessly parses CSV exports from:
    * **TeslaMate** (`Date`, `Energy added`, `% Start`, `% End`, `Odometer`, `Location`, `Type`)
    * **Tronity** (`timestamp`, `charged_kwh`, `start_soc`, `end_soc`, `mileage`)
-   * **ABRP / OpenEVSE / Home Assistant / Formats personnalisés**.
-   * Possibilité de fournir un mapping manuel via `--mapping`.
+   * **ABRP / OpenEVSE / Home Assistant / Generic Wallbox logs**.
+   * Custom column mapping override supported via `--mapping`.
 
-2. **Modélisation Statistique & Marge d'Erreur (IC 95%)** :
-   * **Filtrage de bruit** : Ne retient que les charges profondes ($\Delta\% \ge 40\,\%$) pour éliminer le bruit d'arrondi des entiers de pourcentage de batterie.
-   * **Régression locale gaussienne pondérée (LOWESS)** : Ajuste la courbe de tendance sur la capacité réelle sans supposer a priori une fonction rigide.
-   * **Bandes de confiance à 95%** : Calculées à partir de la variance résiduelle locale ($\pm 1{,}96 \times \sigma_{\text{local}}$).
+2. **Statistical Modeling & Uncertainty Bounds (95% CI)**:
+   * **Noise Filtering**: Retains charging sessions with $\Delta\% \ge 40\%$ to eliminate integer percentage truncation noise from onboard BMS telemetry.
+   * **Gaussian Kernel Local Regression (LOWESS)**: Non-parametric curve fitting capturing non-linear degradation and BMS recalibration plateaus without rigid modeling assumptions.
+   * **95% Confidence Band**: Computed from local weighted residual variance ($\pm 1.96 \times \sigma_{\text{local}}$).
 
-3. **Rapport d'Expertise Professionnel & Moderne (HTML/PDF)** :
-   * Dashboard interactif Plotly (zoom, survol, infobulles précises).
-   * Courbe 1 : Évolution de la capacité utile dans le temps (kWh) avec bande d'incertitude.
-   * Courbe 2 : Évolution du State of Health (SOH %) avec bande d'incertitude.
-   * Courbe 3 : Dégradation en fonction du kilométrage (odomètre).
-   * Tableau de bord trimestriel : Médiane, écart-type et indice de fiabilité de 1 à 5 étoiles (★).
-   * Mise en page print-friendly (compatible impression PDF direct ou `weasyprint`).
+3. **Executive & Modern HTML/PDF Report**:
+   * Interactive Plotly charts (zoom, hover tooltips, responsive).
+   * Chart 1: Chronological usable capacity trajectory (kWh) with uncertainty band.
+   * Chart 2: State of Health (SOH %) evolution over time.
+   * Chart 3: Degradation correlated with odometer distance.
+   * Quarterly certified breakdown table: Median, standard deviation, and reliability star ratings (★).
+   * Print-optimized layout (native one-click PDF export via browser).
 
 ---
 
-## ⚙️ Options CLI disponibles
+## ⚙️ CLI Arguments
 
-* `-o`, `--output` : Chemin du fichier HTML de sortie (par défaut : `rapport_soh.html`).
-* `--min-delta` : Seuil minimal de variation de batterie $\Delta\%$ pour qualifier une session (défaut : `40.0`).
-* `-m`, `--mapping` : Spécification manuelle des colonnes si les noms sont exotiques :
+* `-o`, `--output`: Output HTML report filepath (default: `battery_soh_report.html`).
+* `--min-delta`: Minimum battery state of charge variation $\Delta\%$ required to qualify a session (default: `40.0`).
+* `-m`, `--mapping`: Custom column override for unconventional CSV headers:
   ```bash
-  ev-battery-soh data.csv -m date=horodatage energy_added=kwh_recus soc_start=batterie_debut soc_end=batterie_fin odometer=compteur
+  ev-battery-soh data.csv -m date=timestamp energy_added=charge_kwh soc_start=initial_soc soc_end=final_soc odometer=km_counter
   ```
 
 ---
 
-## 💡 Interprétation des Résultats pour l'Utilisateur
-Quand l'agent présente les résultats, il doit structurer sa réponse en 4 points :
-1. **Capacité initiale vs Capacité actuelle** : en kWh avec la marge d'erreur à 95%.
-2. **SOH actuel (%)** : avec son intervalle de confiance.
-3. **Qualité du vieillissement** : comparer la perte de capacité avec les moyennes de la chimie de batterie (LFP vs NMC/NCA, typiquement 3 à 5% à 50 000 km pour LFP).
-4. **Lien vers le rapport généré** : chemin absolu vers le rapport HTML navigable.
+## 💡 Interpreting Results for the User
+When presenting conclusions, the agent should structure the response around:
+1. **Initial Baseline vs Current Usable Capacity**: in kWh with 95% error margin.
+2. **Current SOH (%)**: with confidence interval.
+3. **Aging Dynamics**: comparing degradation against fleet averages for the specific cell chemistry (e.g., LFP vs NMC/NCA, typically 3% to 5% loss at 60,000 km for LFP).
+4. **Report Link**: absolute or relative link to the interactive HTML report.

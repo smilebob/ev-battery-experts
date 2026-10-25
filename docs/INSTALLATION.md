@@ -1,64 +1,64 @@
-# 📖 Guide d'Installation Complet
+# 📖 Complete Installation Guide
 
-Ce guide détaille l'installation de la suite **EV Battery SOH Analyzer** sur différents systèmes d'exploitation (**Linux, macOS, Windows**) et avec différents gestionnaires de paquets (**pip, uv, Docker/CLI**).
+This guide covers installing the **EV Battery SOH Analyzer** across different operating systems (**Linux, macOS, Windows**) using modern package managers (**uv, pip**).
 
 ---
 
-## 📋 Prérequis Généraux
+## 📋 General Requirements
 
-* **Python** : Version **3.9** ou supérieure (Python 3.10, 3.11, 3.12, 3.13, 3.14 pris en charge).
-* **Git** : Pour cloner le dépôt.
+* **Python**: Version **3.9** or higher (supports Python 3.9, 3.10, 3.11, 3.12, 3.13, and 3.14+).
+* **Git**: To clone the repository.
 
-Vérifiez votre version de Python :
+Verify your Python version:
 ```bash
-python3 --version  # ou 'python --version' sous Windows
+python3 --version  # or 'python --version' on Windows
 ```
 
 ---
 
-## 🛠️ Méthode 1 : Installation avec `uv` (Recommandé - Rapide & Isolé)
+## 🛠️ Method 1: Installation with `uv` (Recommended - Fast & Isolated)
 
-[`uv`](https://github.com/astral-sh/uv) est un gestionnaire d'environnement Python ultra-rapide.
+[`uv`](https://github.com/astral-sh/uv) is an extremely fast Python package manager.
 
-### Sur Linux / macOS :
+### Linux / macOS:
 ```bash
-# 1. Cloner le dépôt
+# 1. Clone repository
 git clone https://github.com/smilebob/ev-battery-experts.git
 cd ev-battery-experts
 
-# 2. Créer l'environnement virtuel
+# 2. Create virtual environment
 uv venv
 
-# 3. Activer l'environnement
+# 3. Activate virtual environment
 source .venv/bin/activate
 
-# 4. Installer le package en mode éditable
+# 4. Install package in editable mode
 uv pip install -e .
 ```
 
-### Sur Windows (PowerShell) :
+### Windows (PowerShell):
 ```powershell
-# 1. Cloner le dépôt
+# 1. Clone repository
 git clone https://github.com/smilebob/ev-battery-experts.git
 cd ev-battery-experts
 
-# 2. Créer l'environnement virtuel
+# 2. Create virtual environment
 uv venv
 
-# 3. Activer l'environnement
+# 3. Activate virtual environment
 .venv\Scripts\Activate.ps1
 
-# 4. Installer le package
+# 4. Install package
 uv pip install -e .
 ```
 
 ---
 
-## 🐍 Méthode 2 : Installation standard avec `pip`
+## 🐍 Method 2: Standard Installation with `pip`
 
-Si vous n'utilisez pas `uv`, vous pouvez utiliser le système standard `venv` et `pip`.
+You can also use standard Python `venv` and `pip`.
 
-### Sur Linux / macOS :
+### Linux / macOS:
 ```bash
 git clone https://github.com/smilebob/ev-battery-experts.git
 cd ev-battery-experts
@@ -68,7 +68,7 @@ pip install --upgrade pip
 pip install -e .
 ```
 
-### Sur Windows (Invite de commandes ou PowerShell) :
+### Windows (Command Prompt or PowerShell):
 ```cmd
 git clone https://github.com/smilebob/ev-battery-experts.git
 cd ev-battery-experts
@@ -80,34 +80,34 @@ pip install -e .
 
 ---
 
-## 🧪 Vérification de l'Installation
+## 🧪 Verifying Installation
 
-Une fois l'environnement activé, testez la commande :
+With the environment activated, check the CLI:
 ```bash
 ev-battery-soh --help
 ```
-Le menu d'aide doit s'afficher sans erreur :
+The help screen should display:
 ```text
 usage: main.py [-h] [--output OUTPUT] [--min-delta MIN_DELTA]
                [--mapping [MAPPING ...]]
                csv_path
 
-Analyse de State of Health (SOH) et dégradation de batterie pour véhicule électrique
+Electric Vehicle Battery State of Health (SOH) and Capacity Degradation Analyzer
 ...
 ```
 
 ---
 
-## 🤖 Installation pour Google Antigravity
+## 🤖 Installing for Google Antigravity
 
-Pour que l'agent et la compétence soient détectés globalement dans votre environnement Antigravity :
+To register this skill and agent persona globally inside your Google Antigravity environment:
 
 ```bash
-# Lier la skill globalement
+# Link skill globally
 mkdir -p ~/.gemini/config/skills
 ln -sfn "$(pwd)/skills/ev-battery-soh" ~/.gemini/config/skills/ev-battery-soh
 
-# Lier l'agent globalement
+# Link agent persona globally
 mkdir -p ~/.gemini/config/agents
 ln -sfn "$(pwd)/agents/ev-battery-expert.md" ~/.gemini/config/agents/ev-battery-expert.md
 ```

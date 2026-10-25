@@ -1,111 +1,109 @@
-# 📘 Manuel d'Utilisation & Guide Pratique
+# 📘 User Manual & Practical Guide
 
-Ce manuel explique comment utiliser **EV Battery SOH Analyzer**, interpréter les rapports générés et adapter le traitement à différents formats de données.
-
----
-
-## 🚀 1. Utilisation de Base (Ligne de Commande)
-
-La commande principale est `ev-battery-soh` (ou `python3 main.py`).
-
-### Syntaxe générale :
-```bash
-ev-battery-soh <chemin_du_fichier.csv> [options]
-```
-
-### Exemple simple :
-```bash
-ev-battery-soh charges_2026.csv -o rapport_expertise.html
-```
-Cette commande :
-1. Lit le fichier `charges_2026.csv`.
-2. Détecte automatiquement les colonnes de recharges.
-3. Filtre les sessions pour éliminer le bruit.
-4. Calcule les régressions et bandes de confiance à 95%.
-5. Écrit le rapport interactif dans `rapport_expertise.html`.
+This manual explains how to operate the **EV Battery SOH Analyzer**, interpret generated assessment reports, and configure custom data sources.
 
 ---
 
-## 🗂️ 2. Formats de Fichiers CSV Reconnus
+## 🚀 1. Basic CLI Usage
 
-L'analyseur intègre un moteur de détection basé sur des synonymes.
+The primary command is `ev-battery-soh` (or `python3 main.py`).
 
-### Formats nativement pris en charge :
-* **TeslaMate** : Colonnes `Date`, `Energy added`, `% Start`, `% End`, `Odometer`, `Location`, `Type`.
-* **Tronity** : Colonnes `timestamp`, `charged_kwh`, `start_soc`, `end_soc`, `mileage`.
-* **ABRP (A Better Routeplanner)** : Logs de session de recharge.
-* **OpenEVSE / Home Assistant / Wallbox** : Exports de sessions avec énergie injectée et SoC.
+### Syntax:
+```bash
+ev-battery-soh <path_to_file.csv> [options]
+```
 
-### Colonnes minimales requises :
-| Donnée | Exemples de noms reconnus |
+### Example:
+```bash
+ev-battery-soh charging_logs.csv -o battery_assessment.html
+```
+This command automatically:
+1. Reads `charging_logs.csv`.
+2. Auto-detects telemetric columns.
+3. Filters shallow sessions to remove BMS integer rounding noise.
+4. Performs Gaussian local regression and computes 95% confidence bands.
+5. Emits the interactive report to `battery_assessment.html`.
+
+---
+
+## 🗂️ 2. Supported CSV File Formats
+
+The analyzer features an intelligent synonym dictionary supporting popular EV telemetry loggers.
+
+### Native Support:
+* **TeslaMate**: Columns `Date`, `Energy added`, `% Start`, `% End`, `Odometer`, `Location`, `Type`.
+* **Tronity**: Columns `timestamp`, `charged_kwh`, `start_soc`, `end_soc`, `mileage`.
+* **ABRP (A Better Routeplanner)**: Standard charging session exports.
+* **OpenEVSE / Home Assistant / Wallbox**: Generic charging session logs with net energy and SoC.
+
+### Required Fields:
+| Metric | Supported Header Examples |
 | :--- | :--- |
-| **Date & Heure** | `Date`, `datetime`, `timestamp`, `start_date`, `time` |
-| **Énergie injectée** | `Energy added`, `kwh_added`, `charge_kwh`, `energie_ajoutee` |
-| **SoC Début** | `% Start`, `soc_start`, `battery_start`, `start_soc` |
-| **SoC Fin** | `% End`, `soc_end`, `battery_end`, `end_soc` |
-| **Kilométrage** *(Optionnel)* | `Odometer`, `mileage`, `km`, `compteur` |
+| **Date & Time** | `Date`, `datetime`, `timestamp`, `start_date`, `time` |
+| **Net Energy Added** | `Energy added`, `kwh_added`, `charge_kwh`, `energie_ajoutee` |
+| **Start State of Charge** | `% Start`, `soc_start`, `battery_start`, `start_soc` |
+| **End State of Charge** | `% End`, `soc_end`, `battery_end`, `end_soc` |
+| **Odometer** *(Optional)* | `Odometer`, `mileage`, `km`, `compteur` |
 
 ---
 
-## 🛠️ 3. Options Avancées
+## 🛠️ 3. Advanced CLI Options
 
-### A. Spécification manuelle des colonnes (`--mapping` ou `-m`)
-Si votre fichier provient d'une application exotique avec des noms de colonnes inhabituels :
+### A. Custom Column Mapping (`--mapping` or `-m`)
+If your file uses custom or localized column names, map them explicitly:
 ```bash
-ev-battery-soh export_brut.csv \
-  -m date="Horodatage_Session" \
-     energy_added="Net_Kwh_Batterie" \
-     soc_start="Niveau_Initial_Pct" \
-     soc_end="Niveau_Final_Pct" \
-     odometer="Index_Kilometres" \
-  -o rapport.html
+ev-battery-soh raw_export.csv \
+  -m date="Session_Timestamp" \
+     energy_added="Delivered_Kwh" \
+     soc_start="Initial_SoC_Pct" \
+     soc_end="Final_SoC_Pct" \
+     odometer="Odo_Reading_Km" \
+  -o report.html
 ```
 
-### B. Ajuster le seuil de qualification de recharge (`--min-delta`)
-Par défaut, seules les charges avec une amplitude $\Delta\% \ge 40\,\%$ sont prises en compte (pour éliminer l'erreur d'arrondi numérique du BMS sur les petites recharges).
-* Si vous avez peu de longues charges et souhaitez inclure les charges moyennes :
+### B. Adjusting Qualification Threshold (`--min-delta`)
+By default, sessions with $\Delta\% \ge 40\%$ are analyzed to eliminate integer rounding noise.
+* To relax the threshold and include moderate charges:
   ```bash
-  ev-battery-soh charges.csv --min-delta 30 -o rapport.html
+  ev-battery-soh charges.csv --min-delta 30 -o report.html
   ```
-* Si vous ne voulez conserver que les charges quasi-complètes :
+* To restrict strictly to deep full charges:
   ```bash
-  ev-battery-soh charges.csv --min-delta 60 -o rapport.html
+  ev-battery-soh charges.csv --min-delta 60 -o report.html
   ```
 
 ---
 
-## 📊 4. Comprendre le Rapport Généré
+## 📊 4. Interpreting the Report
 
-Le rapport HTML contient 4 sections majeures :
+The generated HTML report includes 4 core sections:
 
-### 1. Cartouche officiel & KPIs
-* **SOH Actuel & Marge d'erreur** : Ex. `96.33% ± 1.25% (IC 95%)`. Signifie qu'il y a 95% de certitude statistique que la capacité réelle se trouve dans cet intervalle.
-* **Capacité Utile Actuelle** : Quantité maximale de kWh que la batterie peut stocker aujourd'hui.
-* **Capacité Initiale ($C_0$)** : Référence médiane calculée sur le premier décile de charges (véhicule neuf).
+### 1. Executive Summary & KPIs
+* **Current SOH & Margin of Error**: e.g., `95.81% ± 2.42% (95% CI)`. Indicates 95% statistical certainty that true battery health lies within this range.
+* **Current Usable Capacity**: Maximum deliverable energy when charged to 100%.
+* **Baseline Capacity ($C_0$)**: Median capacity established when the battery was new.
 
-### 2. Courbe 1 : Capacité utile (kWh) vs Temps
-* **Points gris** : Sessions de recharges réelles observées.
-* **Ligne bleue continue** : Tendance centrale (régression locale gaussienne LOWESS).
-* **Bande bleue transparente** : Intervalle d'incertitude locale à 95%.
+### 2. Chart 1: Usable Capacity (kWh) vs Time
+* **Dark points**: Actual recorded charging sessions.
+* **Solid blue line**: Central trend trajectory (Gaussian weighted local regression).
+* **Translucent blue band**: 95% confidence uncertainty interval.
 
-### 3. Courbe 2 : State of Health (%) vs Temps
-* Même représentation normalisée en pourcentage par rapport au neuf.
+### 3. Chart 2: State of Health (%) vs Time
+* Normalized percentage health over time relative to baseline ($C_0$).
 
-### 4. Courbe 3 : Dégradation vs Kilométrage
-* Évolution en fonction des kilomètres parcourus sur l'odomètre.
+### 4. Chart 3: Degradation vs Odometer Distance
+* Battery capacity correlated directly with vehicle travel distance.
 
-### 5. Synthèse Trimestrielle & Indice de Fiabilité (★)
-* Chaque trimestre bénéficie d'une note de 1 à 5 étoiles :
-  * ★★★★★ : Échantillon important, nombreuses charges à 100%, dispersion très faible.
-  * ★★★☆☆ : Échantillon réduit ou période avec plus forte dispersion thermique (hiver).
+### 5. Quarterly Breakdown Table & Reliability Rating (★)
+* Each quarter receives a 1 to 5 star rating based on sample size, 100% calibration events, and residual variance.
 
 ---
 
-## 🖨️ 5. Export en PDF Officiel
+## 🖨️ 5. Exporting to PDF
 
-Le rapport HTML est optimisé pour les feuilles de style d'impression (`@media print`) :
-1. Ouvrez `rapport_soh.html` dans Chrome, Firefox ou Safari.
-2. Appuyez sur `Ctrl + P` (ou `Cmd + P` sur Mac).
-3. Choisissez **"Enregistrer au format PDF"**.
-4. Cochez **"Graphismes d'arrière-plan"** pour préserver les couleurs et styles.
-5. Vous obtenez un rapport PDF multipage propre et imprimable.
+The report stylesheet includes dedicated `@media print` rules:
+1. Open the `.html` report in Chrome, Firefox, Safari, or Edge.
+2. Press `Ctrl + P` (or `Cmd + P` on macOS).
+3. Select **"Save as PDF"**.
+4. Enable **"Background graphics"**.
+5. Save a clean, multi-page executive assessment PDF document.
