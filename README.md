@@ -17,6 +17,10 @@ ev-battery-experts/
 ├── main.py                  # Point d'entrée CLI exécutable
 ├── analyzer.py              # Moteur statistique, régressions LOWESS, génération Plotly & Jinja2
 ├── pyproject.toml           # Configuration de packaging standard (pip / uv / hatchling)
+├── docs/                    # 📚 Documentation détaillée
+│   ├── INSTALLATION.md      # Manuel d'installation (Linux, macOS, Windows, uv, pip)
+│   ├── USAGE.md             # Manuel d'utilisation, options CLI & formats CSV
+│   └── METHODOLOGY.md       # Méthodologie scientifique & formules mathématiques
 ├── skills/
 │   └── ev-battery-soh/
 │       └── SKILL.md         # Spécification universelle de la compétence (Agent Skill)
@@ -24,6 +28,14 @@ ev-battery-experts/
 │   └── ev-battery-expert.md # Définition de l'Agent IA Expert Batterie
 └── README.md
 ```
+
+---
+
+## 📚 Documentation Complète
+
+* **[Guide d'Installation](docs/INSTALLATION.md)** : Installation pas à pas sur Linux, macOS et Windows (via `pip` ou `uv`).
+* **[Manuel d'Utilisation](docs/USAGE.md)** : Guide pratique, syntaxe CLI, mapping personnalisé et export PDF.
+* **[Méthodologie Scientifique](docs/METHODOLOGY.md)** : Formules mathématiques, traitement du bruit, régressions locales gaussiennes et calcul des intervalles de confiance à 95%.
 
 ---
 
