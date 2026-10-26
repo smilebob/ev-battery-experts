@@ -19,6 +19,10 @@ Works seamlessly:
 ev-battery-experts/
 ├── main.py                  # CLI executable entry point
 ├── analyzer.py              # Statistical engine, LOWESS regression, Plotly & Jinja2 report generator
+├── chemistries.py           # Multi-chemistry battery database & vehicle pack catalog (LFP, NMC, NCA)
+├── parsers.py               # Polymorphic data ingestion (TeslaMate, ScanMyTesla, Tronity, Generic)
+├── certificate.py           # Tamper-evident battery health certificate generator with SHA-256
+├── mcp_server.py            # Native Model Context Protocol (MCP) server for AI assistants
 ├── pyproject.toml           # Standard PEP 517/621 packaging configuration
 ├── LICENSE                  # BSD 3-Clause License
 ├── docs/                    # 📚 Documentation

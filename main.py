@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from analyzer import SOHAnalyzer
 from i18n import TRANSLATIONS
+from chemistries import infer_pack_from_capacity
+from certificate import generate_certificate_html
 
 
 def parse_mapping(mapping_args):
@@ -65,6 +67,13 @@ def main():
         type=int,
         default=3,
         help="Number of future years to project degradation (default: 3)",
+    )
+    parser.add_argument(
+        "--certificate",
+        "-c",
+        type=Path,
+        default=None,
+        help="Generate a tamper-evident certified battery inspection sheet HTML (e.g., certificate.html)",
     )
     parser.add_argument(
         "--mapping",
@@ -123,6 +132,16 @@ def main():
         print(f"Generating interactive professional HTML report in '{args.lang}'...")
         analyzer.generate_html_report(result, args.output)
         print(f"-> Report ready: {args.output.resolve()}\n")
+
+        if args.certificate:
+            pack_key, pack_info = infer_pack_from_capacity(result.initial_capacity)
+            v_info = {
+                "make": pack_info.make,
+                "model": f"{pack_info.model} {pack_info.variant}",
+                "chemistry": pack_info.chemistry.name
+            }
+            generate_certificate_html(result, args.csv_path, args.certificate, v_info, lang=args.lang)
+            print(f"-> Certificate ready: {args.certificate.resolve()}\n")
 
     except Exception as e:
         print(f"Error during analysis: {e}", file=sys.stderr)

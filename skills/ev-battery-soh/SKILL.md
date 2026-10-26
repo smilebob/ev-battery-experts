@@ -57,6 +57,7 @@ ev-battery-soh "/path/to/charges.csv" --lang es -o informe.html
 * `-l`, `--lang`: Report language: `en`, `fr`, or `es` (default: `en`).
 * `--annual-km`: Projected annual driving distance in km (default: automatically computed from odometer logs).
 * `--forecast-years`: Number of years to project forward (default: `3`).
+* `--certificate`, `-c`: Generate a tamper-evident certified battery inspection sheet (e.g. `cert.html`).
 * `--min-delta`: Minimum battery state of charge variation $\Delta\%$ required to qualify a session (default: `40.0`).
 * `-m`, `--mapping`: Custom column override for unconventional CSV headers:
   ```bash

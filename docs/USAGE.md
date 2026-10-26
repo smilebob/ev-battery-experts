@@ -33,6 +33,22 @@ You can customize the projection horizon and annual driving pace:
 # Project 4 years ahead assuming 25,000 km/year
 ev-battery-soh charges.csv --annual-km 25000 --forecast-years 4 -o report_forecast.html
 ```
+
+### Official Resale Certificate Generation (`--certificate` or `-c`):
+Generate a tamper-evident, sealed battery inspection certificate with SHA-256 fingerprint and condition grade (A+, A, B, C, D) for vehicle resale:
+```bash
+ev-battery-soh charges.csv -c certificate_resale.html
+```
+
+---
+
+## 🤖 Model Context Protocol (MCP) Integration
+
+The project includes a native MCP server (`mcp_server.py`) exposing battery diagnostics to AI environments (Antigravity, Claude Desktop, Cursor):
+
+* **Available MCP Tools**:
+  * `analyze_battery`: Analyzes CSV, models degradation, and outputs structured JSON diagnostics.
+  * `get_vehicle_pack_catalog`: Returns nominal capacities and chemistry profiles for all registered EV models.
 This command automatically:
 1. Reads `charging_logs.csv`.
 2. Auto-detects telemetric columns.
