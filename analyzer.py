@@ -552,12 +552,22 @@ class SOHAnalyzer:
             hovertemplate="<b>" + t["axis_date"] + "</b>: %{x|%Y-%m-%d}<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f} kWh<extra></extra>"
         ))
         fig_cap_time.update_layout(
-            title=t["chart_cap_title"],
-            xaxis_title=t["axis_date"],
-            yaxis_title=t["axis_capacity"],
+            title=dict(text=t["chart_cap_title"], x=0.02, xanchor="left", font=dict(size=16)),
+            xaxis=dict(title=t["axis_date"], automargin=True),
+            yaxis=dict(title=t["axis_capacity"], automargin=True),
             template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=40, r=40, t=80, b=40),
+            height=500,
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.22,
+                xanchor="center",
+                x=0.5,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="#e2e8f0",
+                borderwidth=1
+            ),
+            margin=dict(l=60, r=40, t=60, b=90),
             hovermode="x unified"
         )
         figs["capacity_time"] = fig_cap_time
@@ -617,13 +627,22 @@ class SOHAnalyzer:
         ))
         min_soh_plot = min(min(m["soh_lower"]), min(m["forecast_soh_sev"]))
         fig_soh_time.update_layout(
-            title=t["chart_soh_title"],
-            xaxis_title=t["axis_date"],
-            yaxis_title=t["axis_soh"],
-            yaxis_range=[max(70, min_soh_plot - 2), 103],
+            title=dict(text=t["chart_soh_title"], x=0.02, xanchor="left", font=dict(size=16)),
+            xaxis=dict(title=t["axis_date"], automargin=True),
+            yaxis=dict(title=t["axis_soh"], automargin=True, range=[max(70, min_soh_plot - 2), 103]),
             template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=40, r=40, t=80, b=40),
+            height=500,
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.22,
+                xanchor="center",
+                x=0.5,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="#e2e8f0",
+                borderwidth=1
+            ),
+            margin=dict(l=60, r=40, t=60, b=90),
             hovermode="x unified"
         )
         figs["soh_time"] = fig_soh_time
@@ -656,12 +675,22 @@ class SOHAnalyzer:
                 hovertemplate="<b>" + t["axis_odometer"] + "</b>: %{x:,.0f} km<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f} kWh<extra></extra>"
             ))
             fig_odo.update_layout(
-                title=t["chart_odo_title"],
-                xaxis_title=t["axis_odometer"],
-                yaxis_title=t["axis_capacity"],
+                title=dict(text=t["chart_odo_title"], x=0.02, xanchor="left", font=dict(size=16)),
+                xaxis=dict(title=t["axis_odometer"], automargin=True),
+                yaxis=dict(title=t["axis_capacity"], automargin=True),
                 template="plotly_white",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=40, r=40, t=80, b=40),
+                height=500,
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.22,
+                    xanchor="center",
+                    x=0.5,
+                    bgcolor="rgba(255,255,255,0.9)",
+                    bordercolor="#e2e8f0",
+                    borderwidth=1
+                ),
+                margin=dict(l=60, r=40, t=60, b=90),
                 hovermode="x unified"
             )
             figs["capacity_odometer"] = fig_odo
@@ -826,8 +855,10 @@ class SOHAnalyzer:
             margin-bottom: 20px;
         }
         .chart-container {
-            margin: 20px 0;
-            min-height: 440px;
+            margin: 24px 0 10px 0;
+            min-height: 520px;
+            width: 100%;
+            position: relative;
         }
         table {
             width: 100%;
@@ -835,10 +866,18 @@ class SOHAnalyzer:
             font-size: 0.9rem;
             margin-top: 10px;
         }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
         th, td {
-            padding: 12px 14px;
+            padding: 14px 16px;
             text-align: left;
             border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
         th {
             background-color: #f1f5f9;
@@ -977,6 +1016,7 @@ class SOHAnalyzer:
     <div class="section-card">
         <h2>{{ t.sec4_title }}</h2>
         <p class="section-desc">{{ t.sec4_desc.format(mean_temp=result.mean_temperature, dc_pct=result.dc_energy_pct, annual_km=result.annual_km|round|int) }}</p>
+        <div class="table-responsive">
         <table>
             <thead>
                 <tr>
@@ -1010,6 +1050,7 @@ class SOHAnalyzer:
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         <div class="callout forecast">
             {{ t.forecast_callout.format(
@@ -1029,6 +1070,7 @@ class SOHAnalyzer:
     <div class="section-card">
         <h2>{{ t.sec5_title }}</h2>
         <p class="section-desc">{{ t.sec5_desc }}</p>
+        <div class="table-responsive">
         <table>
             <thead>
                 <tr>
@@ -1057,6 +1099,7 @@ class SOHAnalyzer:
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         <div class="callout">
             {{ t.callout_text.format(soh="%.2f"|format(result.current_soh), soh_err="%.2f"|format(result.current_soh_err), odo="{:,.0f}".format(result.odometer_max))|safe }}
