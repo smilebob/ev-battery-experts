@@ -75,12 +75,14 @@ $$\text{SOH Uncertainty}(t) = \frac{1.96 \times s(t)}{C_0} \times 100$$
 
 To project future degradation over 1 to 5+ years without assuming linear decay, we implement a semi-empirical model based on lithium-ion degradation kinetics:
 
-$$C_{\text{pred}}(t, \text{km}) = C_0 - \left( \alpha \sqrt{t} + \beta \cdot \text{km} \right)$$
+$$C_{\text{pred}}(t, \text{km}) = C_0 - \left( \alpha \sqrt{t} \cdot f_{\text{Arrh}}(T) + \beta \cdot (1 + 1.8 \cdot r_{\text{DC}}) \cdot \text{km} + L_{\text{knee}}(t, \text{km}) \right)$$
 
 Where:
-* **$\alpha \sqrt{t}$ (Calendar Aging & SEI Passivation)**: Governed by the parabolic diffusion rate of solvent molecules through the solid electrolyte interphase (SEI) on the negative electrode. As the SEI layer thickens, the growth rate slows down proportionally to $\frac{1}{\sqrt{t}}$.
-* **$\beta \cdot \text{km}$ (Cyclic Aging & Active Material Loss)**: Mechanical particle cracking, lithium plating, and active material loss directly proportional to the charge throughput (energy cycled per kilometer).
-* **$\text{km} = \text{km}_0 + \Delta t \times \text{annual\_km}$**: Derived automatically from historical telemetry or user-defined assumptions (`--annual-km`).
+* **$\alpha \sqrt{t} \cdot f_{\text{Arrh}}(T)$ (Calendar Aging & SEI Passivation)**: Governed by the parabolic diffusion rate of solvent molecules through the solid electrolyte interphase (SEI) on the negative electrode, modulated by Arrhenius thermal activation.
+* **$\beta \cdot (1 + 1.8 \cdot r_{\text{DC}}) \cdot \text{km}$ (Cyclic Aging & Active Material Loss)**: Mechanical particle cracking and lithium loss scaled by the DC fast-charging stress ratio $r_{\text{DC}}$.
+* **$L_{\text{knee}}(t, \text{km})$ (Non-Linear End-of-Life Knee Point)**: Represents late-stage cell exhaustion (loss of cyclable lithium inventory, electrolyte dry-out, and active material degradation):
+  $$L_{\text{knee}}(t, \text{km}) = 0.50 \left[ \left(\max\left(0, \frac{\text{cycles} - \text{cycle\_threshold}}{350}\right)\right)^2 + \left(\max\left(0, \frac{t - 12.0}{3.0}\right)\right)^2 \right]$$
+  This captures the pronounced downward curvature (knee) naturally observed after 12–15 years or beyond 2,500–3,000 equivalent full cycles.
 
 ### Future Confidence Cone:
 Because future uncertainty naturally compounds over time, the predictive confidence cone expands asymptotically:

@@ -211,6 +211,26 @@ class SOHAnalyzer:
         factor = np.exp(- (E_a / R) * (1.0 / T_kelvin - 1.0 / T_ref))
         return float(np.clip(factor, 0.5, 2.5))
 
+    def _compute_knee_loss(self, t_years: float, km_total: float, dc_stress: float) -> float:
+        """
+        Computes non-linear end-of-life knee acceleration (loss in kWh).
+        On LFP chemistry (CATL prismatics):
+         - Cycle aging knee activates above ~2500-3000 EFC (accelerated by DC fast-charging).
+         - Calendar aging knee activates after ~12-14 years due to electrolyte consumption
+           and binder/interface degradation.
+        """
+        # Equivalent full cycles (assuming ~380 km per 100% cycle)
+        cycles = km_total / 380.0
+        cycle_threshold = 2800.0 / dc_stress
+        cycle_knee = np.maximum(0.0, (cycles - cycle_threshold) / 350.0) ** 2
+
+        # Calendar threshold (typically 12 years under mild temperature)
+        cal_threshold = 12.0
+        cal_knee = np.maximum(0.0, (t_years - cal_threshold) / 3.0) ** 2
+
+        knee_loss = 0.50 * (cycle_knee + cal_knee)
+        return float(knee_loss)
+
     def _fit_electrochemical_model(
         self, t_years: np.ndarray, km_total: np.ndarray, cap_observed: np.ndarray, c0: float,
         dc_ratio: float, mean_temp: float, weights: np.ndarray
@@ -359,10 +379,11 @@ class SOHAnalyzer:
 
             for s_name, s_cfg in scen_configs.items():
                 km_f = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (d / 365.25) * s_cfg["annual_km"]
+                knee = self._compute_knee_loss(t_f, km_f, s_cfg["dc_stress"])
                 cap_s = initial_capacity - (
-                    alpha * np.sqrt(t_f) * s_cfg["arrh"] + beta * s_cfg["dc_stress"] * km_f
+                    alpha * np.sqrt(t_f) * s_cfg["arrh"] + beta * s_cfg["dc_stress"] * km_f + knee
                 ) + offset
-                forecast_dense[s_name].append(cap_s)
+                forecast_dense[s_name].append(max(0.0, cap_s))
 
         # Annual milestones table
         scenario_milestones: List[ScenarioMilestone] = []
@@ -373,17 +394,20 @@ class SOHAnalyzer:
 
             # Optimistic
             km_opt = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["optimistic"]["annual_km"]
-            cap_opt = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["optimistic"]["arrh"] + beta * scen_configs["optimistic"]["dc_stress"] * km_opt) + offset
+            knee_opt = self._compute_knee_loss(t_f, km_opt, scen_configs["optimistic"]["dc_stress"])
+            cap_opt = max(0.0, initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["optimistic"]["arrh"] + beta * scen_configs["optimistic"]["dc_stress"] * km_opt + knee_opt) + offset)
             soh_opt = (cap_opt / initial_capacity) * 100.0
 
             # Realistic
             km_real = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["realistic"]["annual_km"]
-            cap_real = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["realistic"]["arrh"] + beta * scen_configs["realistic"]["dc_stress"] * km_real) + offset
+            knee_real = self._compute_knee_loss(t_f, km_real, scen_configs["realistic"]["dc_stress"])
+            cap_real = max(0.0, initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["realistic"]["arrh"] + beta * scen_configs["realistic"]["dc_stress"] * km_real + knee_real) + offset)
             soh_real = (cap_real / initial_capacity) * 100.0
 
             # Severe
             km_sev = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["severe"]["annual_km"]
-            cap_sev = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["severe"]["arrh"] + beta * scen_configs["severe"]["dc_stress"] * km_sev) + offset
+            knee_sev = self._compute_knee_loss(t_f, km_sev, scen_configs["severe"]["dc_stress"])
+            cap_sev = max(0.0, initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["severe"]["arrh"] + beta * scen_configs["severe"]["dc_stress"] * km_sev + knee_sev) + offset)
             soh_sev = (cap_sev / initial_capacity) * 100.0
 
             label = f"+{yr} yr" if self.lang == "en" else (f"+{yr} an" if self.lang == "fr" else f"+{yr} año")
