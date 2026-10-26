@@ -13,6 +13,8 @@ from analyzer import SOHAnalyzer
 from i18n import TRANSLATIONS
 from chemistries import infer_pack_from_capacity
 from certificate import generate_certificate_html
+from pdf_certificate import generate_certified_pdf
+from verifier import verify_certificate_token
 
 
 def parse_mapping(mapping_args):
@@ -34,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Electric Vehicle Battery State of Health (SOH) and Capacity Degradation Analyzer"
     )
-    parser.add_argument("csv_path", type=Path, help="Path to the charging telemetry CSV file")
+    parser.add_argument("csv_path", type=Path, nargs="?", default=None, help="Path to the charging telemetry CSV file")
     parser.add_argument(
         "--output",
         "-o",
@@ -76,6 +78,24 @@ def main():
         help="Generate a tamper-evident certified battery inspection sheet HTML (e.g., certificate.html)",
     )
     parser.add_argument(
+        "--pdf-certificate",
+        type=Path,
+        default=None,
+        help="Generate an official, tamper-evident, cryptographically signed inspection PDF certificate with QR code",
+    )
+    parser.add_argument(
+        "--private-key",
+        type=Path,
+        default=None,
+        help="Path to custom ECDSA/RSA private key PEM file to sign the certificate (default: autonomous local agent key)",
+    )
+    parser.add_argument(
+        "--verify-token",
+        type=str,
+        default=None,
+        help="Verify the cryptographic authenticity of a certificate URI or QR payload",
+    )
+    parser.add_argument(
         "--vin",
         type=str,
         default=None,
@@ -89,6 +109,22 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Verification mode shortcut
+    if args.verify_token:
+        print("Authenticating Certificate Payload...")
+        res = verify_certificate_token(args.verify_token)
+        print("=" * 60)
+        print(f"VERIFICATION STATUS : {res.get('status', 'INVALID')}")
+        print("=" * 60)
+        for k, v in res.items():
+            print(f"  {k:20s}: {v}")
+        print("=" * 60)
+        sys.exit(0 if res.get("valid") else 1)
+
+    if not args.csv_path:
+        parser.print_help()
+        sys.exit(1)
 
     if not args.csv_path.exists():
         print(f"Error: File '{args.csv_path}' does not exist.", file=sys.stderr)
@@ -158,7 +194,27 @@ def main():
                 "chemistry": pack_info.chemistry.name
             }
             generate_certificate_html(result, args.csv_path, args.certificate, v_info, lang=args.lang, vin=result.vin)
-            print(f"-> Certificate ready: {args.certificate.resolve()}\n")
+            print(f"-> HTML Certificate ready: {args.certificate.resolve()}\n")
+
+        if args.pdf_certificate:
+            pack_key, pack_info = infer_pack_from_capacity(result.initial_capacity)
+            v_info = {
+                "make": pack_info.make,
+                "model": f"{pack_info.model} {pack_info.variant}",
+                "chemistry": pack_info.chemistry.name
+            }
+            pdf_info = generate_certified_pdf(
+                result=result,
+                csv_file=args.csv_path,
+                output_pdf_path=args.pdf_certificate,
+                vehicle_info=v_info,
+                lang=args.lang,
+                vin=result.vin,
+                private_key_path=args.private_key
+            )
+            print(f"-> Signed PDF Certificate ready: {pdf_info['pdf_path']}")
+            print(f"   Fingerprint (SHA-256): {pdf_info['dataset_hash']}")
+            print(f"   Signature (ECDSA): {pdf_info['signature_b64'][:40]}...\n")
 
     except Exception as e:
         print(f"Error during analysis: {e}", file=sys.stderr)
