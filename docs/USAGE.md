@@ -25,6 +25,14 @@ ev-battery-soh charges.csv --lang fr -o rapport_fr.html
 # Spanish (Español)
 ev-battery-soh charges.csv --lang es -o informe_es.html
 ```
+
+### Future Degradation Forecasting (`--annual-km` and `--forecast-years`):
+By default, the tool calculates the historical annual mileage from your odometer data and projects degradation over 3 years.
+You can customize the projection horizon and annual driving pace:
+```bash
+# Project 4 years ahead assuming 25,000 km/year
+ev-battery-soh charges.csv --annual-km 25000 --forecast-years 4 -o report_forecast.html
+```
 This command automatically:
 1. Reads `charging_logs.csv`.
 2. Auto-detects telemetric columns.

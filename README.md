@@ -93,11 +93,12 @@ ev-battery-soh charges.csv --min-delta 30 -o battery_report.html
 
 The generated interactive HTML report provides:
 1. **Executive Scorecard**: Current SOH with 95% margin of error ($\pm X\%$), current usable capacity ($\pm X\text{ kWh}$), baseline capacity $C_0$, and cumulative loss.
-2. **Chart 1: Usable Capacity Trajectory (kWh)** with 95% confidence interval band.
-3. **Chart 2: State of Health (SOH %)** over time.
+2. **Chart 1: Usable Capacity Trajectory & Projections (kWh)** with 95% confidence interval band and future predictive cone.
+3. **Chart 2: State of Health (SOH %) & Multi-Year Forecast** over time.
 4. **Chart 3: Degradation vs Odometer Mileage**.
-5. **Certified Quarterly Breakdown Table**: Median, standard deviation, and reliability star ratings (★).
-6. **Native Print-to-PDF**: Pre-styled for direct executive PDF exports via your browser (`Ctrl+P` / `Cmd+P`).
+5. **Section 4: Electrochemical Degradation Forecast Table**: Explicit breakdown (+1 yr, +2 yr, +3 yr) with projected dates, mileage, capacity, and SOH.
+6. **Section 5: Certified Quarterly Breakdown Table**: Median, standard deviation, and reliability star ratings (★).
+7. **Native Print-to-PDF**: Pre-styled for direct executive PDF exports via your browser (`Ctrl+P` / `Cmd+P`).
 
 ---
 

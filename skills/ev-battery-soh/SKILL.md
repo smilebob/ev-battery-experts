@@ -1,47 +1,52 @@
 ---
 name: ev-battery-soh
-description: Advanced telemetric State of Health (SOH) and battery capacity degradation analyzer for electric vehicles (Tesla, Tronity, ABRP, or generic charging CSV exports). Calculates residual usable capacity, local statistical regression with 95% uncertainty band, quarterly breakdown with reliability ratings, and generates executive-grade interactive HTML/PDF reports.
+description: Advanced telemetric State of Health (SOH) and battery capacity degradation analyzer for electric vehicles (Tesla, Tronity, ABRP, or generic charging CSV exports). Calculates residual usable capacity, local statistical regression with 95% uncertainty band, quarterly breakdown with reliability ratings, electrochemical future forecasting (SEI growth ∝ √t + cyclic wear ∝ km), and generates executive-grade interactive HTML/PDF reports in English, French, or Spanish.
 ---
 
-# EV Battery SOH Analysis Skill
+# EV Battery SOH Analysis & Forecasting Skill
 
-This skill allows any AI Agent (Google Antigravity, Claude Code, Cursor, AutoGPT, OpenAI Swarm/Assistants) to analyze EV charging session telemetric logs and produce a scientific, executive-grade battery health assessment report.
+This skill allows any AI Agent (Google Antigravity, Claude Code, Cursor, AutoGPT, OpenAI Swarm/Assistants) to analyze EV charging session telemetric logs, evaluate current SOH, model statistical uncertainty, and project future degradation trajectories based on driving habits.
 
 ---
 
-## 🚀 Universal Execution
+## 🚀 Execution & Usage
 
-Run the tool using the global command or the standalone Python entry point:
+Run the tool using the global CLI command or standalone Python:
 ```bash
-# Option 1: Via global CLI command (if installed via pip install -e .)
+# Basic run (automatic annual mileage from data, English report)
 ev-battery-soh "/path/to/charges.csv" -o "/path/to/soh_report.html"
 
-# Option 2: Via standalone script
-python3 main.py "/path/to/charges.csv" -o "/path/to/soh_report.html"
+# French report with user-defined annual mileage (e.g. 20,000 km/year) for 4 years
+ev-battery-soh "/path/to/charges.csv" --lang fr --annual-km 20000 --forecast-years 4 -o rapport.html
+
+# Spanish report
+ev-battery-soh "/path/to/charges.csv" --lang es -o informe.html
 ```
 
 ---
 
-## 📊 Core Features
+## 📊 Core Capabilities
 
 1. **Automatic & Fault-Tolerant Column Detection**:
-   Seamlessly parses CSV exports from:
-   * **TeslaMate** (`Date`, `Energy added`, `% Start`, `% End`, `Odometer`, `Location`, `Type`)
-   * **Tronity** (`timestamp`, `charged_kwh`, `start_soc`, `end_soc`, `mileage`)
-   * **ABRP / OpenEVSE / Home Assistant / Generic Wallbox logs**.
-   * Custom column mapping override supported via `--mapping`.
+   Seamlessly parses CSV exports from **TeslaMate**, **Tronity**, **ABRP**, **OpenEVSE**, and custom loggers.
+   Custom column mapping override supported via `--mapping`.
 
 2. **Statistical Modeling & Uncertainty Bounds (95% CI)**:
    * **Noise Filtering**: Retains charging sessions with $\Delta\% \ge 40\%$ to eliminate integer percentage truncation noise from onboard BMS telemetry.
    * **Gaussian Kernel Local Regression (LOWESS)**: Non-parametric curve fitting capturing non-linear degradation and BMS recalibration plateaus without rigid modeling assumptions.
    * **95% Confidence Band**: Computed from local weighted residual variance ($\pm 1.96 \times \sigma_{\text{local}}$).
 
-3. **Executive & Modern HTML/PDF Report**:
+3. **Electrochemical Future Forecasting**:
+   * Combines **parabolic calendar passivation** (SEI layer growth $\propto \sqrt{t}$) with **cyclic degradation** ($\propto \text{km}$).
+   * Automatically derives baseline annual mileage from historical odometer logs, or accepts user custom projections via `--annual-km`.
+   * Projects future capacity and SOH milestones (+1 yr, +2 yr, +3 yr, up to `--forecast-years`).
+   * Visualizes the future trajectory on Plotly charts with a dashed projection line and expanding 95% uncertainty cone.
+
+4. **Executive & Modern Multilingual HTML/PDF Report**:
+   * Languages: English (`--lang en`), French (`--lang fr`), Spanish (`--lang es`).
    * Interactive Plotly charts (zoom, hover tooltips, responsive).
-   * Chart 1: Chronological usable capacity trajectory (kWh) with uncertainty band.
-   * Chart 2: State of Health (SOH %) evolution over time.
-   * Chart 3: Degradation correlated with odometer distance.
-   * Quarterly certified breakdown table: Median, standard deviation, and reliability star ratings (★).
+   * Certified Quarterly breakdown table with 1 to 5 star reliability ratings (★).
+   * Dedicated future projections table with target dates, projected mileage, and confidence intervals.
    * Print-optimized layout (native one-click PDF export via browser).
 
 ---
@@ -49,6 +54,9 @@ python3 main.py "/path/to/charges.csv" -o "/path/to/soh_report.html"
 ## ⚙️ CLI Arguments
 
 * `-o`, `--output`: Output HTML report filepath (default: `battery_soh_report.html`).
+* `-l`, `--lang`: Report language: `en`, `fr`, or `es` (default: `en`).
+* `--annual-km`: Projected annual driving distance in km (default: automatically computed from odometer logs).
+* `--forecast-years`: Number of years to project forward (default: `3`).
 * `--min-delta`: Minimum battery state of charge variation $\Delta\%$ required to qualify a session (default: `40.0`).
 * `-m`, `--mapping`: Custom column override for unconventional CSV headers:
   ```bash
@@ -59,7 +67,7 @@ python3 main.py "/path/to/charges.csv" -o "/path/to/soh_report.html"
 
 ## 💡 Interpreting Results for the User
 When presenting conclusions, the agent should structure the response around:
-1. **Initial Baseline vs Current Usable Capacity**: in kWh with 95% error margin.
-2. **Current SOH (%)**: with confidence interval.
-3. **Aging Dynamics**: comparing degradation against fleet averages for the specific cell chemistry (e.g., LFP vs NMC/NCA, typically 3% to 5% loss at 60,000 km for LFP).
+1. **Current Usable Capacity & SOH**: in kWh and % with 95% error margin.
+2. **Current Aging Evaluation**: comparing against fleet benchmarks for the specific cell chemistry (e.g. LFP vs NMC).
+3. **Future Projections**: state the assumed annual mileage, and provide expected SOH and capacity at +1, +2, and +3 years.
 4. **Report Link**: absolute or relative link to the interactive HTML report.

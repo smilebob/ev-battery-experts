@@ -68,3 +68,21 @@ The baseline capacity when new ($C_0$) is determined by the median capacity of i
 
 $$\text{SOH}(t) = \frac{\hat{C}(t)}{C_0} \times 100$$
 $$\text{SOH Uncertainty}(t) = \frac{1.96 \times s(t)}{C_0} \times 100$$
+
+---
+
+## 5. Semi-Empirical Electrochemical Aging Forecasting
+
+To project future degradation over 1 to 5+ years without assuming linear decay, we implement a semi-empirical model based on lithium-ion degradation kinetics:
+
+$$C_{\text{pred}}(t, \text{km}) = C_0 - \left( \alpha \sqrt{t} + \beta \cdot \text{km} \right)$$
+
+Where:
+* **$\alpha \sqrt{t}$ (Calendar Aging & SEI Passivation)**: Governed by the parabolic diffusion rate of solvent molecules through the solid electrolyte interphase (SEI) on the negative electrode. As the SEI layer thickens, the growth rate slows down proportionally to $\frac{1}{\sqrt{t}}$.
+* **$\beta \cdot \text{km}$ (Cyclic Aging & Active Material Loss)**: Mechanical particle cracking, lithium plating, and active material loss directly proportional to the charge throughput (energy cycled per kilometer).
+* **$\text{km} = \text{km}_0 + \Delta t \times \text{annual\_km}$**: Derived automatically from historical telemetry or user-defined assumptions (`--annual-km`).
+
+### Future Confidence Cone:
+Because future uncertainty naturally compounds over time, the predictive confidence cone expands asymptotically:
+$$\text{Uncertainty}(t_{\text{future}}) = \pm 1.96 \cdot s(t_0) \sqrt{1 + 0.35 \cdot \Delta t_{\text{years}}}$$
+This accurately bounds potential deviations in driving habits, extreme seasonal temperatures, or DC fast-charging intensity.

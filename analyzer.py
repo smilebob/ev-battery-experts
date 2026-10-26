@@ -1,10 +1,12 @@
 """
 EV Battery State of Health (SOH) and Capacity Degradation Analyzer
 Supports multilingual reporting: English (en), French (fr), Spanish (es).
+Includes electrochemical degradation modeling (SEI growth ∝ √t + cyclic wear ∝ km)
+and predictive future forecasting.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
@@ -26,6 +28,18 @@ COLUMN_SYNONYMS = {
 
 
 @dataclass
+class ForecastPoint:
+    horizon_label: str
+    target_date: datetime
+    projected_odometer: float
+    projected_capacity: float
+    projected_capacity_err: float
+    projected_soh: float
+    projected_soh_err: float
+    total_degradation_pct: float
+
+
+@dataclass
 class SOHResult:
     analysis_date: datetime
     total_charges: int
@@ -41,6 +55,8 @@ class SOHResult:
     current_soh: float
     current_soh_err: float
     total_degradation_pct: float
+    annual_km: float
+    forecast_points: List[ForecastPoint]
     quarterly_data: List[Dict[str, Any]]
     df_filtered: pd.DataFrame
     model_details: Dict[str, Any]
@@ -48,11 +64,20 @@ class SOHResult:
 
 
 class SOHAnalyzer:
-    def __init__(self, custom_mapping: Optional[Dict[str, str]] = None, min_delta_soc: float = 40.0, lang: str = "en"):
+    def __init__(
+        self,
+        custom_mapping: Optional[Dict[str, str]] = None,
+        min_delta_soc: float = 40.0,
+        lang: str = "en",
+        annual_km: Optional[float] = None,
+        forecast_years: int = 3,
+    ):
         self.custom_mapping = custom_mapping or {}
         self.min_delta_soc = min_delta_soc
         self.lang = lang if lang in TRANSLATIONS else "en"
         self.t = TRANSLATIONS[self.lang]
+        self.custom_annual_km = annual_km
+        self.forecast_years = forecast_years
 
     def detect_columns(self, df: pd.DataFrame) -> Dict[str, str]:
         cols = {c.strip().lower(): c for c in df.columns}
@@ -155,6 +180,39 @@ class SOHAnalyzer:
 
         return y_fit, y_std
 
+    def _fit_electrochemical_model(
+        self, t_years: np.ndarray, km_total: np.ndarray, cap_observed: np.ndarray, c0: float
+    ) -> Tuple[float, float]:
+        """
+        Fits C(t, km) = C0 - (alpha * sqrt(t) + beta * km)
+        where alpha = SEI passivation growth rate (calendar aging)
+              beta = cyclic loss per km (cycling wear)
+        """
+        # Loss in kWh
+        loss = np.maximum(0.0, c0 - cap_observed)
+        # Features matrix: [sqrt(t), km]
+        feat_sei = np.sqrt(np.maximum(0.01, t_years))
+        feat_km = km_total
+
+        X = np.column_stack([feat_sei, feat_km])
+        # Non-negative least squares or bounded ridge regression
+        try:
+            # Linear regression without intercept (loss is 0 at t=0, km=0)
+            res = np.linalg.lstsq(X, loss, rcond=None)[0]
+            alpha, beta = float(res[0]), float(res[1])
+            # Physical bounds check for LFP chemistry
+            if alpha < 0 or beta < 0:
+                # Fallback to dominant calendar SEI aging
+                alpha = float(np.mean(loss / feat_sei))
+                beta = 0.0
+        except Exception:
+            alpha = 1.2
+            beta = 1.5e-5
+
+        alpha = max(0.2, min(3.0, alpha))
+        beta = max(0.0, min(5e-5, beta))
+        return alpha, beta
+
     def analyze(self, df_raw: pd.DataFrame) -> SOHResult:
         df_filtered = df_raw[df_raw["delta_soc"] >= self.min_delta_soc].copy()
 
@@ -167,11 +225,13 @@ class SOHAnalyzer:
         if len(df_filtered) < 3:
             raise ValueError("Insufficient qualified charging sessions to model SOH trajectory.")
 
+        # Baseline capacity C0
         early_subset = df_filtered.head(max(5, int(len(df_filtered) * 0.12)))
         initial_capacity = float(early_subset["capacity_raw"].median())
 
         df_filtered["soh_raw"] = (df_filtered["capacity_raw"] / initial_capacity) * 100.0
 
+        # Time features
         t_timestamps = df_filtered["date"].map(pd.Timestamp.timestamp).values
         t_days = (t_timestamps - t_timestamps[0]) / 86400.0
         y_cap = df_filtered["capacity_raw"].values
@@ -189,10 +249,84 @@ class SOHAnalyzer:
         current_soh_err = (current_capacity_err / initial_capacity) * 100.0
         total_degradation = 100.0 - current_soh
 
+        # Odometer & Annual km calculation
+        has_odometer = df_filtered["odometer"].notna().sum() > len(df_filtered) * 0.6
+        total_days = max(1.0, (df_filtered["date"].max() - df_filtered["date"].min()).total_seconds() / 86400.0)
+        total_years = total_days / 365.25
+
+        if self.custom_annual_km is not None and self.custom_annual_km > 0:
+            annual_km = float(self.custom_annual_km)
+        elif has_odometer:
+            odo_span = float(df_filtered["odometer"].max() - df_filtered["odometer"].min())
+            annual_km = float((odo_span / total_days) * 365.25)
+            annual_km = max(3000.0, annual_km)
+        else:
+            annual_km = 15000.0
+
+        current_odometer = float(df_filtered["odometer"].max()) if has_odometer else 0.0
+
+        # Electrochemical model fitting: C = C0 - (alpha * sqrt(t) + beta * km)
+        t_years_series = t_days / 365.25
+        km_series = (df_filtered["odometer"].values - df_filtered["odometer"].min()) if has_odometer else (t_years_series * annual_km)
+        alpha, beta = self._fit_electrochemical_model(t_years_series, km_series, y_cap, initial_capacity)
+
+        # Future forecasting
+        last_date = df_filtered["date"].max()
+        forecast_points: List[ForecastPoint] = []
+        forecast_dates_dense: List[datetime] = []
+        forecast_cap_dense: List[float] = []
+        forecast_upper_dense: List[float] = []
+        forecast_lower_dense: List[float] = []
+
+        # Current calibration offset so prediction starts smoothly from current_capacity
+        current_model_cap = initial_capacity - (alpha * np.sqrt(total_years) + beta * (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)))
+        offset = current_capacity - current_model_cap
+
+        # Dense evaluation points for smooth chart line
+        dense_days = np.linspace(0, self.forecast_years * 365.25, 100)
+        for d in dense_days:
+            f_date = last_date + timedelta(days=float(d))
+            t_f = total_years + (d / 365.25)
+            km_f = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (d / 365.25) * annual_km
+            pred_cap = initial_capacity - (alpha * np.sqrt(t_f) + beta * km_f) + offset
+            # Uncertainty expands slightly with horizon
+            uncert = current_capacity_err * np.sqrt(1.0 + 0.35 * (d / 365.25))
+
+            forecast_dates_dense.append(f_date)
+            forecast_cap_dense.append(pred_cap)
+            forecast_upper_dense.append(pred_cap + uncert)
+            forecast_lower_dense.append(pred_cap - uncert)
+
+        # Milestone annual points (+1 yr, +2 yr, +3 yr, ...)
+        for yr in range(1, self.forecast_years + 1):
+            target_dt = last_date + timedelta(days=int(yr * 365.25))
+            t_f = total_years + yr
+            proj_odo = current_odometer + (yr * annual_km)
+            km_delta = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (yr * annual_km)
+            pred_cap = initial_capacity - (alpha * np.sqrt(t_f) + beta * km_delta) + offset
+            uncert = current_capacity_err * np.sqrt(1.0 + 0.35 * yr)
+            pred_soh = (pred_cap / initial_capacity) * 100.0
+            pred_soh_err = (uncert / initial_capacity) * 100.0
+            deg_pct = 100.0 - pred_soh
+
+            label = f"+{yr} yr" if self.lang == "en" else (f"+{yr} an" if self.lang == "fr" else f"+{yr} año")
+            forecast_points.append(
+                ForecastPoint(
+                    horizon_label=label,
+                    target_date=target_dt,
+                    projected_odometer=proj_odo,
+                    projected_capacity=round(pred_cap, 2),
+                    projected_capacity_err=round(uncert, 2),
+                    projected_soh=round(pred_soh, 2),
+                    projected_soh_err=round(pred_soh_err, 2),
+                    total_degradation_pct=round(deg_pct, 2),
+                )
+            )
+
+        # Odometer regression if available
         odo_eval = None
         cap_fit_odo = None
         cap_std_odo = None
-        has_odometer = df_filtered["odometer"].notna().sum() > len(df_filtered) * 0.6
         if has_odometer:
             df_odo = df_filtered.dropna(subset=["odometer"]).sort_values("odometer")
             x_odo = df_odo["odometer"].values
@@ -202,6 +336,7 @@ class SOHAnalyzer:
                 bw_odo = max(2000.0, (x_odo[-1] - x_odo[0]) * 0.15)
                 cap_fit_odo, cap_std_odo = self._local_weighted_regression(x_odo, y_cap_odo, odo_eval, bw_odo)
 
+        # Quarterly breakdown
         df_filtered["quarter"] = df_filtered["date"].dt.to_period("Q").astype(str)
         quarterly_list = []
         for q, grp in df_filtered.groupby("quarter"):
@@ -248,6 +383,8 @@ class SOHAnalyzer:
             current_soh=current_soh,
             current_soh_err=current_soh_err,
             total_degradation_pct=total_degradation,
+            annual_km=annual_km,
+            forecast_points=forecast_points,
             quarterly_data=quarterly_list,
             df_filtered=df_filtered,
             min_delta_soc=self.min_delta_soc,
@@ -259,6 +396,13 @@ class SOHAnalyzer:
                 "soh_fit": [round((v / initial_capacity) * 100.0, 2) for v in cap_fit],
                 "soh_upper": [round(((v + 1.96 * s) / initial_capacity) * 100.0, 2) for v, s in zip(cap_fit, cap_std)],
                 "soh_lower": [round(((v - 1.96 * s) / initial_capacity) * 100.0, 2) for v, s in zip(cap_fit, cap_std)],
+                "forecast_dates": [d.strftime("%Y-%m-%d") for d in forecast_dates_dense],
+                "forecast_cap": [round(v, 2) for v in forecast_cap_dense],
+                "forecast_cap_upper": [round(v, 2) for v in forecast_upper_dense],
+                "forecast_cap_lower": [round(v, 2) for v in forecast_lower_dense],
+                "forecast_soh": [round((v / initial_capacity) * 100.0, 2) for v in forecast_cap_dense],
+                "forecast_soh_upper": [round((v / initial_capacity) * 100.0, 2) for v in forecast_upper_dense],
+                "forecast_soh_lower": [round((v / initial_capacity) * 100.0, 2) for v in forecast_lower_dense],
                 "has_odometer": has_odometer,
                 "odo_eval": [round(v, 0) for v in odo_eval] if odo_eval is not None else [],
                 "cap_fit_odo": [round(v, 2) for v in cap_fit_odo] if cap_fit_odo is not None else [],
@@ -273,8 +417,9 @@ class SOHAnalyzer:
         m = result.model_details
         t = self.t
 
-        # 1. Capacity vs Time
+        # 1. Capacity vs Time (Historical + Forecast)
         fig_cap_time = go.Figure()
+        # Historical confidence band
         fig_cap_time.add_trace(go.Scatter(
             x=m["eval_dates"] + m["eval_dates"][::-1],
             y=m["cap_upper"] + m["cap_lower"][::-1],
@@ -284,6 +429,17 @@ class SOHAnalyzer:
             name=t["chart_cap_ci"],
             hoverinfo="skip"
         ))
+        # Forecast confidence band
+        fig_cap_time.add_trace(go.Scatter(
+            x=m["forecast_dates"] + m["forecast_dates"][::-1],
+            y=m["forecast_cap_upper"] + m["forecast_cap_lower"][::-1],
+            fill="toself",
+            fillcolor="rgba(249, 115, 22, 0.12)",
+            line=dict(color="rgba(255,255,255,0)"),
+            name=t["chart_cap_forecast_ci"],
+            hoverinfo="skip"
+        ))
+        # Historical trend line
         fig_cap_time.add_trace(go.Scatter(
             x=m["eval_dates"],
             y=m["cap_fit"],
@@ -291,13 +447,22 @@ class SOHAnalyzer:
             line=dict(color="#0284c7", width=3),
             name=t["chart_cap_trend"]
         ))
+        # Forecast projection line (dashed)
+        fig_cap_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_cap"],
+            mode="lines",
+            line=dict(color="#ea580c", width=3, dash="dash"),
+            name=t["chart_cap_forecast"]
+        ))
+        # Raw data points
         fig_cap_time.add_trace(go.Scatter(
             x=df["date"],
             y=df["capacity_raw"],
             mode="markers",
             marker=dict(color="#0f172a", size=6, opacity=0.45),
             name=t["chart_cap_points"].format(min_delta=result.min_delta_soc),
-            hovertemplate="<b>" + t["axis_date"] + "</b>: %{x|%Y-%m-%d}<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f}<extra></extra>"
+            hovertemplate="<b>" + t["axis_date"] + "</b>: %{x|%Y-%m-%d}<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f} kWh<extra></extra>"
         ))
         fig_cap_time.update_layout(
             title=t["chart_cap_title"],
@@ -310,8 +475,9 @@ class SOHAnalyzer:
         )
         figs["capacity_time"] = fig_cap_time
 
-        # 2. SOH vs Time
+        # 2. SOH vs Time (Historical + Forecast)
         fig_soh_time = go.Figure()
+        # Historical band
         fig_soh_time.add_trace(go.Scatter(
             x=m["eval_dates"] + m["eval_dates"][::-1],
             y=m["soh_upper"] + m["soh_lower"][::-1],
@@ -321,6 +487,17 @@ class SOHAnalyzer:
             name=t["chart_cap_ci"],
             hoverinfo="skip"
         ))
+        # Forecast band
+        fig_soh_time.add_trace(go.Scatter(
+            x=m["forecast_dates"] + m["forecast_dates"][::-1],
+            y=m["forecast_soh_upper"] + m["forecast_soh_lower"][::-1],
+            fill="toself",
+            fillcolor="rgba(249, 115, 22, 0.12)",
+            line=dict(color="rgba(255,255,255,0)"),
+            name=t["chart_cap_forecast_ci"],
+            hoverinfo="skip"
+        ))
+        # Historical trend
         fig_soh_time.add_trace(go.Scatter(
             x=m["eval_dates"],
             y=m["soh_fit"],
@@ -328,6 +505,15 @@ class SOHAnalyzer:
             line=dict(color="#059669", width=3),
             name=t["chart_soh_trend"]
         ))
+        # Forecast trend
+        fig_soh_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_soh"],
+            mode="lines",
+            line=dict(color="#ea580c", width=3, dash="dash"),
+            name=t["chart_soh_forecast"]
+        ))
+        # Raw points
         fig_soh_time.add_trace(go.Scatter(
             x=df["date"],
             y=df["soh_raw"],
@@ -336,11 +522,12 @@ class SOHAnalyzer:
             name=t["chart_soh_points"],
             hovertemplate="<b>" + t["axis_date"] + "</b>: %{x|%Y-%m-%d}<br><b>" + t["axis_soh"] + "</b>: %{y:.2f} %<extra></extra>"
         ))
+        min_soh_plot = min(min(m["soh_lower"]), min(m["forecast_soh_lower"]))
         fig_soh_time.update_layout(
             title=t["chart_soh_title"],
             xaxis_title=t["axis_date"],
             yaxis_title=t["axis_soh"],
-            yaxis_range=[max(80, min(m["soh_lower"]) - 2), 103],
+            yaxis_range=[max(70, min_soh_plot - 2), 103],
             template="plotly_white",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=40, r=40, t=80, b=40),
@@ -373,7 +560,7 @@ class SOHAnalyzer:
                 mode="markers",
                 marker=dict(color="#0f172a", size=6, opacity=0.45),
                 name=t["chart_cap_points"].format(min_delta=result.min_delta_soc),
-                hovertemplate="<b>" + t["axis_odometer"] + "</b>: %{x:,.0f} km<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f}<extra></extra>"
+                hovertemplate="<b>" + t["axis_odometer"] + "</b>: %{x:,.0f} km<br><b>" + t["axis_capacity"] + "</b>: %{y:.2f} kWh<extra></extra>"
             ))
             fig_odo.update_layout(
                 title=t["chart_odo_title"],
@@ -394,6 +581,10 @@ class SOHAnalyzer:
         chart_soh_time_html = figs["soh_time"].to_html(full_html=False, include_plotlyjs=False)
         chart_odo_html = figs["capacity_odometer"].to_html(full_html=False, include_plotlyjs=False) if "capacity_odometer" in figs else ""
 
+        # Average annual SOH loss in forecast
+        final_fp = result.forecast_points[-1]
+        annual_loss = round((result.current_soh - final_fp.projected_soh) / len(result.forecast_points), 2)
+
         html_template = """<!DOCTYPE html>
 <html lang="{{ lang }}">
 <head>
@@ -406,6 +597,7 @@ class SOHAnalyzer:
             --primary-light: #1e293b;
             --accent: #0284c7;
             --success: #059669;
+            --warning: #ea580c;
             --border: #e2e8f0;
             --bg-card: #ffffff;
             --bg-page: #f8fafc;
@@ -581,6 +773,11 @@ class SOHAnalyzer:
             margin-top: 20px;
             line-height: 1.6;
         }
+        .callout.forecast {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+        }
         .footer {
             text-align: center;
             color: var(--text-muted);
@@ -668,10 +865,44 @@ class SOHAnalyzer:
     </div>
     {% endif %}
 
-    <!-- QUARTERLY BREAKDOWN -->
+    <!-- FORECAST SECTION -->
     <div class="section-card">
         <h2>{{ t.sec4_title }}</h2>
-        <p class="section-desc">{{ t.sec4_desc }}</p>
+        <p class="section-desc">{{ t.sec4_desc.format(annual_km=result.annual_km|round|int) }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ t.th_horizon }}</th>
+                    <th>{{ t.th_target_date }}</th>
+                    <th>{{ t.th_proj_km }}</th>
+                    <th>{{ t.th_proj_cap }}</th>
+                    <th>{{ t.th_proj_soh }}</th>
+                    <th>{{ t.th_proj_loss }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fp in result.forecast_points %}
+                <tr>
+                    <td><strong>{{ fp.horizon_label }}</strong></td>
+                    <td>{{ fp.target_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ "{:,.0f}".format(fp.projected_odometer) }} km</td>
+                    <td>{{ "%.2f"|format(fp.projected_capacity) }} ± {{ "%.2f"|format(fp.projected_capacity_err) }} kWh</td>
+                    <td><strong>{{ "%.2f"|format(fp.projected_soh) }}% ± {{ "%.2f"|format(fp.projected_soh_err) }}%</strong></td>
+                    <td>{{ "%.2f"|format(fp.total_degradation_pct) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="callout forecast">
+            {{ t.forecast_callout.format(annual_loss=annual_loss, end_date=final_fp.target_date.strftime('%Y-%m-%d'), end_soh="%.2f"|format(final_fp.projected_soh), end_soh_err="%.2f"|format(final_fp.projected_soh_err))|safe }}
+        </div>
+    </div>
+
+    <!-- QUARTERLY BREAKDOWN -->
+    <div class="section-card">
+        <h2>{{ t.sec5_title }}</h2>
+        <p class="section-desc">{{ t.sec5_desc }}</p>
         <table>
             <thead>
                 <tr>
@@ -718,6 +949,8 @@ class SOHAnalyzer:
             t=self.t,
             lang=self.lang,
             result=result,
+            annual_loss=annual_loss,
+            final_fp=final_fp,
             chart_cap_time_html=chart_cap_time_html,
             chart_soh_time_html=chart_soh_time_html,
             chart_odo_html=chart_odo_html
