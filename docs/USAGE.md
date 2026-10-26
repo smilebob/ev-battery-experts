@@ -19,8 +19,8 @@ Generate executive reports in **English**, **French**, or **Spanish**:
 # English (Default)
 ev-battery-soh charges.csv --lang en -o report_en.html
 
-# French (Français)
-ev-battery-soh charges.csv --lang fr -o rapport_fr.html
+# French (Français) with explicit Vehicle Identification Number (VIN)
+ev-battery-soh charges.csv --lang fr --vin XP7YGCEK7PB123456 -o rapport_fr.html
 
 # Spanish (Español)
 ev-battery-soh charges.csv --lang es -o informe_es.html
@@ -35,9 +35,9 @@ ev-battery-soh charges.csv --annual-km 25000 --forecast-years 4 -o report_foreca
 ```
 
 ### Official Resale Certificate Generation (`--certificate` or `-c`):
-Generate a tamper-evident, sealed battery inspection certificate with SHA-256 fingerprint and condition grade (A+, A, B, C, D) for vehicle resale:
+Generate a tamper-evident, sealed battery inspection certificate with SHA-256 fingerprint, VIN, and condition grade (A+, A, B, C, D) for vehicle resale:
 ```bash
-ev-battery-soh charges.csv -c certificate_resale.html
+ev-battery-soh charges.csv --vin XP7YGCEK7PB123456 -c certificate_resale.html
 ```
 
 ---

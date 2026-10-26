@@ -19,7 +19,8 @@ def analyze_battery(
     lang: str = "en",
     annual_km: Optional[float] = None,
     forecast_years: int = 3,
-    min_delta: float = 40.0
+    min_delta: float = 40.0,
+    vin: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Analyzes an EV charging telemetry CSV file, models battery capacity and SOH degradation,
@@ -33,7 +34,8 @@ def analyze_battery(
         min_delta_soc=min_delta,
         lang=lang,
         annual_km=annual_km,
-        forecast_years=forecast_years
+        forecast_years=forecast_years,
+        vin=vin
     )
 
     clean_df = analyzer.load_data(path)

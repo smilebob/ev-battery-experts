@@ -76,6 +76,12 @@ def main():
         help="Generate a tamper-evident certified battery inspection sheet HTML (e.g., certificate.html)",
     )
     parser.add_argument(
+        "--vin",
+        type=str,
+        default=None,
+        help="Vehicle Identification Number (VIN - 17 alphanumeric characters, ISO 3779)",
+    )
+    parser.add_argument(
         "--mapping",
         "-m",
         nargs="*",
@@ -90,6 +96,14 @@ def main():
 
     custom_mapping = parse_mapping(args.mapping)
 
+    # VIN format check (ISO 3779: 17 characters, no I, O, Q)
+    normalized_vin = None
+    if args.vin:
+        v = args.vin.strip().upper()
+        if len(v) != 17 or any(c in v for c in ("I", "O", "Q")):
+            print(f"Warning: Specified VIN '{v}' does not strictly match standard ISO 3779 (17 alphanumeric chars without I, O, Q).", file=sys.stderr)
+        normalized_vin = v
+
     print(f"Loading and detecting columns from '{args.csv_path}'...")
     analyzer = SOHAnalyzer(
         custom_mapping=custom_mapping,
@@ -97,6 +111,7 @@ def main():
         lang=args.lang,
         annual_km=args.annual_km,
         forecast_years=args.forecast_years,
+        vin=normalized_vin,
     )
 
     try:
@@ -113,6 +128,8 @@ def main():
         print(f"Qualified sessions   : {result.qualified_charges} (threshold: Δ% ≥ {args.min_delta}%)")
         if result.odometer_max > 0:
             print(f"Current odometer     : {result.odometer_max:,.0f} km")
+        if result.vin:
+            print(f"Vehicle VIN          : {result.vin}")
         print(f"DC fast-charge share : {result.dc_energy_pct:.1f}% energy ({result.dc_charges_count} DC sessions)")
         print(f"Mean charge temp     : {result.mean_temperature:.1f} °C (Arrhenius factor applied)")
         print(f"Baseline capacity C0 : {result.initial_capacity:.2f} kWh")
@@ -140,7 +157,7 @@ def main():
                 "model": f"{pack_info.model} {pack_info.variant}",
                 "chemistry": pack_info.chemistry.name
             }
-            generate_certificate_html(result, args.csv_path, args.certificate, v_info, lang=args.lang)
+            generate_certificate_html(result, args.csv_path, args.certificate, v_info, lang=args.lang, vin=result.vin)
             print(f"-> Certificate ready: {args.certificate.resolve()}\n")
 
     except Exception as e:

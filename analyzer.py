@@ -27,7 +27,8 @@ COLUMN_SYNONYMS = {
     "odometer": ["odometer", "odo", "km", "mileage", "kilometrage", "compteur", "kilometraje", "odometro"],
     "location": ["location", "station", "lieu", "charge_location", "ubicacion"],
     "charge_type": ["type", "charge_type", "fast_charge", "ac_dc", "tipo"],
-    "temperature": ["temp", "temperature", "ambient_temp", "battery_temp", "temperatura"]
+    "temperature": ["temp", "temperature", "ambient_temp", "battery_temp", "temperatura"],
+    "vin": ["vin", "vehicle_identification_number", "numero_serie", "chassis", "car_vin"]
 }
 
 
@@ -69,6 +70,7 @@ class SOHResult:
     df_filtered: pd.DataFrame
     model_details: Dict[str, Any]
     min_delta_soc: float = 40.0
+    vin: Optional[str] = None
 
 
 class SOHAnalyzer:
@@ -79,6 +81,7 @@ class SOHAnalyzer:
         lang: str = "en",
         annual_km: Optional[float] = None,
         forecast_years: int = 3,
+        vin: Optional[str] = None,
     ):
         self.custom_mapping = custom_mapping or {}
         self.min_delta_soc = min_delta_soc
@@ -86,6 +89,7 @@ class SOHAnalyzer:
         self.t = TRANSLATIONS[self.lang]
         self.custom_annual_km = annual_km
         self.forecast_years = forecast_years
+        self.vin = vin
 
     def detect_columns(self, df: pd.DataFrame) -> Dict[str, str]:
         cols = {c.strip().lower(): c for c in df.columns}
@@ -154,6 +158,12 @@ class SOHAnalyzer:
             clean_df["temperature"] = self.parse_numeric(df[col_map["temperature"]])
         else:
             clean_df["temperature"] = np.nan
+
+        if "vin" in col_map and not self.vin:
+            # Auto-detect VIN from first valid entry if not explicitly overridden
+            vin_series = df[col_map["vin"]].dropna().astype(str).str.strip()
+            if not vin_series.empty:
+                self.vin = vin_series.iloc[0]
 
         clean_df = clean_df.dropna(subset=["date", "energy_added", "soc_start", "soc_end"])
         clean_df["delta_soc"] = clean_df["soc_end"] - clean_df["soc_start"]
@@ -493,6 +503,7 @@ class SOHAnalyzer:
             quarterly_data=quarterly_list,
             df_filtered=df_filtered,
             min_delta_soc=self.min_delta_soc,
+            vin=self.vin,
             model_details={
                 "eval_dates": [d.strftime("%Y-%m-%d") for d in eval_dates],
                 "cap_fit": [round(v, 2) for v in cap_fit],
@@ -972,6 +983,12 @@ class SOHAnalyzer:
                 <span class="label">{{ t.meta_date }}</span>
                 <span class="val">{{ result.analysis_date.strftime('%Y-%m-%d %H:%M') }}</span>
             </div>
+            {% if result.vin %}
+            <div class="meta-item">
+                <span class="label">{{ t.meta_vin }}</span>
+                <span class="val" style="font-family: monospace; letter-spacing: 0.05em; color: #38bdf8;">{{ result.vin }}</span>
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <span class="label">{{ t.meta_timeframe }}</span>
                 <span class="val">{{ result.date_min.strftime('%Y-%m-%d') }} &rarr; {{ result.date_max.strftime('%Y-%m-%d') }}</span>

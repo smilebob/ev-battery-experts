@@ -47,10 +47,17 @@ def generate_certificate_html(
     csv_file: Path,
     output_path: Path,
     vehicle_info: Dict[str, Any],
-    lang: str = "en"
+    lang: str = "en",
+    vin: str = None
 ):
     data_hash = calculate_dataset_hash(csv_file)
     grade = get_grade(result.current_soh, result.dc_energy_pct)
+
+    effective_vin = vin or getattr(result, "vin", None)
+    vin_badge = (
+        f'<div style="margin-top: 8px; font-family: monospace; font-size: 0.95rem; font-weight: 700; color: #0369a1; letter-spacing: 0.08em; background: #e0f2fe; padding: 4px 10px; border-radius: 6px; display: inline-block;">VIN: {effective_vin}</div>'
+        if effective_vin else '<div style="margin-top: 8px; font-size: 0.85rem; color: #94a3b8;">VIN: Non spécifié / N/A</div>'
+    )
 
     cert_id = f"CERT-SOH-{result.analysis_date.strftime('%Y%m')}-{data_hash[:8].upper()}"
 
@@ -160,7 +167,8 @@ def generate_certificate_html(
         <p style="font-size: 0.85rem; font-weight: 700; color: #0284c7; letter-spacing: 0.1em; text-transform: uppercase;">Official Inspection Document</p>
         <h1>Electric Vehicle Battery Health Certificate</h1>
         <div class="cert-id">Certificate ID: {cert_id}</div>
-        <div class="grade-badge">{grade.grade}</div>
+        {vin_badge}
+        <div><div class="grade-badge">{grade.grade}</div></div>
         <p style="font-weight: 600; color: #334155;">{grade.description}</p>
     </div>
 
