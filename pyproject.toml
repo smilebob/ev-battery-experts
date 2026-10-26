@@ -9,14 +9,20 @@ authors = [
 license = { text = "BSD-3-Clause" }
 requires-python = ">=3.9"
 dependencies = [
+    "bcrypt>=4.0.0",
     "cryptography>=41.0.0",
+    "fastapi>=0.110.0",
     "jinja2>=3.1.2",
     "numpy>=1.23.0",
     "pandas>=2.0.0",
     "plotly>=5.15.0",
+    "pyjwt>=2.8.0",
+    "python-multipart>=0.0.9",
     "qrcode>=7.4.0",
     "reportlab>=4.0.0",
     "scipy>=1.10.0",
+    "sqlmodel>=0.0.16",
+    "uvicorn>=0.28.0",
 ]
 
 [project.scripts]

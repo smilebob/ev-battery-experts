@@ -1,0 +1,20 @@
+services:
+  ev-battery-soh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ev_battery_soh_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SOH_DATA_DIR=/app/data
+      - SOH_JWT_SECRET=${SOH_JWT_SECRET:-ephemeral_secure_secret_production_soh_98127391}
+    volumes:
+      - ./data:/app/data
+      - ./keys:/root/.config/ev-battery-soh/keys
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

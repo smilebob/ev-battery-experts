@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration & Paramètres — EV Battery SOH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans">
+
+    <!-- Admin Header -->
+    <header class="bg-slate-900 border-b border-slate-800 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-rose-500 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">Panneau d'Administration</h1>
+                    <p class="text-xs text-slate-400">Configuration Globale & Sécurité du Système</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">
+                    <i class="fa-solid fa-user-shield text-emerald-400 mr-1"></i> {{ current_user.username }} ({{ current_user.role }})
+                </span>
+                <a href="/" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Retour à l'application
+                </a>
+                <a href="/admin/logout" class="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-500/10 transition">
+                    <i class="fa-solid fa-power-off mr-1"></i> Déconnexion
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-6 py-8 w-full">
+
+        {% if message %}
+        <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center space-x-2">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            <span>{{ message }}</span>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Left Col: Algorithmic & Physical Tuning -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Section 1: Algorithmic Parameters -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-slate-100">
+                        <i class="fa-solid fa-sliders text-sky-600 text-lg"></i>
+                        <h2 class="text-base font-bold text-slate-900">Paramètres Algorithmiques de Dégradation</h2>
+                    </div>
+                    <form action="/admin/config" method="post" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                    Seuil Minimal Delta SoC (Δ%)
+                                </label>
+                                <input type="number" step="1" name="min_delta_soc" value="{{ config.min_delta_soc }}" class="w-full px-3.5 py-2 border rounded-lg text-sm font-semibold">
+                                <p class="text-xs text-slate-500 mt-1">Élimine le bruit d'arrondi numérique du BMS (Défaut: 40%).</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                    Pondération Recalibration 100%
+                                </label>
+                                <input type="number" step="0.1" name="calibration_100_weight" value="{{ config.calibration_100_weight }}" class="w-full px-3.5 py-2 border rounded-lg text-sm font-semibold">
+                                <p class="text-xs text-slate-500 mt-1">Multiplicateur de poids gaussien à 100% (Défaut: 2.5x).</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                    Horizon Prévisionnel par Défaut (Années)
+                                </label>
+                                <input type="number" step="1" name="default_forecast_years" value="{{ config.default_forecast_years }}" class="w-full px-3.5 py-2 border rounded-lg text-sm font-semibold">
+                            </div>
+                            <div class="flex items-center space-x-3 pt-5">
+                                <input type="checkbox" name="knee_point_enabled" id="knee" {% if config.knee_point_enabled %}checked{% endif %} class="w-4 h-4 text-sky-600 rounded">
+                                <label for="knee" class="text-sm font-semibold text-slate-700">Activer le Coude de Fin de Vie (Knee-point)</label>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <button type="submit" class="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow">
+                                Enregistrer les Paramètres Algorithmiques
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Section 2: Cryptographic Key Management -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-slate-100">
+                        <i class="fa-solid fa-key text-amber-500 text-lg"></i>
+                        <h2 class="text-base font-bold text-slate-900">Gestion des Clés Cryptographiques ECDSA (P-256)</h2>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-xs font-bold text-slate-700 uppercase block mb-1">Clé Publique Active de Vérification (PEM)</span>
+                            <pre class="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs font-mono overflow-x-auto select-all">{{ public_key_pem }}</pre>
+                            <p class="text-xs text-slate-500 mt-1">Cette clé publique permet aux auditeurs tiers et acheteurs de certifier l'intégrité sans compromettre votre signature.</p>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-4 flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-800 uppercase">Régénération de la Clé Locale</h3>
+                                <p class="text-xs text-slate-500">Génère une nouvelle paire asymétrique locale autonome dans l'environnement sécurisé.</p>
+                            </div>
+                            <form action="/admin/regen-keys" method="post" onsubmit="return confirm('Attention : Régénérer la clé invalidera la signature des futurs certificats par rapport à cette clé publique ! Continuer ?');">
+                                <button type="submit" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition">
+                                    <i class="fa-solid fa-arrows-rotate mr-1"></i> Régénérer Nouvelle Clé
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Col: User Management & System Stats -->
+            <div class="space-y-8">
+                <!-- User Management -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-slate-100">
+                        <i class="fa-solid fa-users-gear text-indigo-600 text-lg"></i>
+                        <h2 class="text-base font-bold text-slate-900">Utilisateurs & Rôles</h2>
+                    </div>
+
+                    <div class="space-y-3 mb-6 max-h-60 overflow-y-auto">
+                        {% for u in users %}
+                        <div class="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                            <div>
+                                <span class="font-bold text-slate-900">{{ u.username }}</span>
+                                <span class="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if u.role == 'admin' %}bg-rose-100 text-rose-700{% elif u.role == 'auditor' %}bg-sky-100 text-sky-700{% else %}bg-slate-200 text-slate-700{% endif %}">
+                                    {{ u.role }}
+                                </span>
+                            </div>
+                            <span class="text-slate-400 font-mono text-[10px]">{{ u.created_at.strftime('%Y-%m-%d') }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Create User Form -->
+                    <form action="/admin/users/create" method="post" class="space-y-3 border-t border-slate-100 pt-4">
+                        <span class="text-xs font-bold text-slate-700 uppercase block">Ajouter un Utilisateur</span>
+                        <input type="text" name="username" placeholder="Identifiant" required class="w-full px-3 py-2 border rounded-lg text-xs">
+                        <input type="password" name="password" placeholder="Mot de passe" required class="w-full px-3 py-2 border rounded-lg text-xs">
+                        <select name="role" class="w-full px-3 py-2 border rounded-lg text-xs">
+                            <option value="auditor">Auditeur (Accès rapports & certifications)</option>
+                            <option value="admin">Administrateur (Accès complet réglages)</option>
+                            <option value="viewer">Invité / Lecteur</option>
+                        </select>
+                        <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow transition">
+                            <i class="fa-solid fa-user-plus mr-1"></i> Créer Compte
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Info Box -->
+                <div class="bg-slate-900 text-white rounded-2xl p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-sky-400 uppercase tracking-wider mb-2">Sécurité & Secrets</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed mb-3">
+                        Tous les mots de passe sont hachés et salés avec <strong>bcrypt</strong> (12 rounds). Les sessions sont protégées par <strong>JWT HS256</strong> et les secrets cryptographiques ne sont jamais exposés en clair dans les logs ou la base.
+                    </p>
+                    <div class="text-[10px] text-slate-500 font-mono">
+                        Base: SQLite chiffrée locale / Docker Volume
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

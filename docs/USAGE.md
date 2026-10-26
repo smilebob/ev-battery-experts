@@ -151,7 +151,27 @@ The generated HTML report includes 4 core sections:
 
 ---
 
-## 🖨️ 7. Exporting to PDF
+## 🌐 8. Web Application & Docker Deployment
+
+The solution includes a full-featured, standalone web portal powered by **FastAPI** with Tailwind CSS and an authenticated **Administration Dashboard**.
+
+### Running Locally without Docker:
+```bash
+uvicorn web_app:app --host 0.0.0.0 --port 8000
+```
+Then open `http://localhost:8000` in your web browser.
+
+### Running with Docker Compose:
+```bash
+docker compose up -d
+```
+* **Public Interface (`http://localhost:8000`)**: Web drag-and-drop CSV upload, VIN entry, interactive SOH visualization, and direct downloads of signed PDF certificates and HTML reports.
+* **Admin Dashboard (`http://localhost:8000/admin`)**:
+  * Default Credentials: Username `admin` / Password `admin1234` *(prompted to update on first login)*.
+  * Runtime algorithmic tuning (minimum $\Delta\% \text{SoC}$, 100% calibration multiplier, knee-point switch).
+  * Cryptographic key management: ECDSA P-256 public key export and keypair regeneration.
+  * Multi-user management (Admin, Auditor, Viewer roles) with salted `bcrypt` password protection.
+* **Data Persistence**: Telemetry data, SQLite database, and cryptographic keys are safely persisted in `./data` and `./keys`.
 
 The report stylesheet includes dedicated `@media print` rules:
 1. Open the `.html` report in Chrome, Firefox, Safari, or Edge.
