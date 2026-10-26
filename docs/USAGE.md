@@ -42,28 +42,28 @@ ev-battery-soh charges.csv -c certificate_resale.html
 
 ---
 
-## 🤖 Model Context Protocol (MCP) Integration
+## 🤖 2. Model Context Protocol (MCP) Integration
 
 The project includes a native MCP server (`mcp_server.py`) exposing battery diagnostics to AI environments (Antigravity, Claude Desktop, Cursor):
 
 * **Available MCP Tools**:
   * `analyze_battery`: Analyzes CSV, models degradation, and outputs structured JSON diagnostics.
   * `get_vehicle_pack_catalog`: Returns nominal capacities and chemistry profiles for all registered EV models.
-This command automatically:
-1. Reads `charging_logs.csv`.
-2. Auto-detects telemetric columns.
-3. Filters shallow sessions to remove BMS integer rounding noise.
-4. Performs Gaussian local regression and computes 95% confidence bands.
-5. Emits the interactive report to `battery_assessment.html`.
+
+* **Starting the MCP Server**:
+```bash
+python3 mcp_server.py
+```
 
 ---
 
-## 🗂️ 2. Supported CSV File Formats
+## 🗂️ 3. Supported CSV Formats & Auto-Detection
 
-The analyzer features an intelligent synonym dictionary supporting popular EV telemetry loggers.
+The analyzer features polymorphic ingestion (`parsers.py`) and an intelligent synonym dictionary supporting popular EV telemetry loggers.
 
-### Native Support:
+### Native Loggers Auto-Detected:
 * **TeslaMate**: Columns `Date`, `Energy added`, `% Start`, `% End`, `Odometer`, `Location`, `Type`.
+* **ScanMyTesla (CAN-bus)**: Columns `timestamp`, `nominal_full_pack`, `odometer`, `soc`, `cell_temp`.
 * **Tronity**: Columns `timestamp`, `charged_kwh`, `start_soc`, `end_soc`, `mileage`.
 * **ABRP (A Better Routeplanner)**: Standard charging session exports.
 * **OpenEVSE / Home Assistant / Wallbox**: Generic charging session logs with net energy and SoC.
@@ -79,7 +79,27 @@ The analyzer features an intelligent synonym dictionary supporting popular EV te
 
 ---
 
-## 🛠️ 3. Advanced CLI Options
+## 🔬 4. Multi-Chemistry & Vehicle Pack Catalog
+
+The analyzer incorporates a comprehensive vehicle pack and electrochemical profile database (`chemistries.py`). It automatically infers or applies specific degradation parameters:
+
+* **Chemistries modeled**:
+  * `LFP` (Lithium Ferrophosphate - CATL, BYD Blade): High cyclability (3000-5000 cycles), sensitive to calendar aging and flat OCV calibration drift.
+  * `NMC_811` / `NMC_622` (Nickel Manganese Cobalt): High energy density, higher Arrhenius sensitivity ($E_a \approx 28.5\text{ kJ/mol}$), accelerated cyclic fade at high C-rate.
+  * `NCA` (Nickel Cobalt Aluminum - Panasonic Tesla): High power performance, linear initial degradation followed by distinct rollover.
+  * `SODIUM_ION` (Na-Ion - CATL Na-pack): Zero cobalt/lithium, robust low-temperature resilience, high cycle stability.
+
+* **Supported Vehicle Packs**:
+  * Tesla Model Y / Model 3 (LFP 60 kWh, Long Range NMC 78.1 kWh, Performance NCA 82 kWh).
+  * Renault Mégane E-Tech / Scénic (60 kWh & 87 kWh NMC).
+  * Stellantis e-208 / e-2008 / e-308 (50 kWh & 54 kWh NMC).
+  * Volkswagen ID.3 / ID.4 / ID.Buzz (58 kWh & 77 kWh NMC).
+  * MG 4 Electric (51 kWh LFP & 64 kWh NMC).
+  * Hyundai Ioniq 5 / Kia EV6 (58 kWh, 77.4 kWh, 84 kWh NMC).
+
+---
+
+## 🛠️ 5. Advanced CLI Options
 
 ### A. Custom Column Mapping (`--mapping` or `-m`)
 If your file uses custom or localized column names, map them explicitly:
@@ -106,7 +126,7 @@ By default, sessions with $\Delta\% \ge 40\%$ are analyzed to eliminate integer 
 
 ---
 
-## 📊 4. Interpreting the Report
+## 📊 6. Interpreting the Report
 
 The generated HTML report includes 4 core sections:
 
@@ -131,7 +151,7 @@ The generated HTML report includes 4 core sections:
 
 ---
 
-## 🖨️ 5. Exporting to PDF
+## 🖨️ 7. Exporting to PDF
 
 The report stylesheet includes dedicated `@media print` rules:
 1. Open the `.html` report in Chrome, Firefox, Safari, or Edge.
