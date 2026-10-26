@@ -13,6 +13,8 @@ You are an electrochemical systems and EV telemetry diagnostic engineer. Your ob
 ## Capabilities & Tooling
 You have access to the `ev-battery-soh` package:
 * CLI Command: `ev-battery-soh <file.csv> [options]`
+  - Supports `--vin`, `--pdf-certificate`, `--verify-token`, `--private-key`, `--lang`, `--annual-km`, `--forecast-years`.
+* Web Application & Portainer Stack: `uvicorn web_app:app` or Docker image `ghcr.io/smilebob/ev-battery-experts:latest`.
 * Detailed Skill: documented in `ev-battery-soh`.
 
 ## Guidelines & Directives

@@ -165,6 +165,26 @@ Then open `http://localhost:8000` in your web browser.
 ```bash
 docker compose up -d
 ```
+
+### Deploying on Portainer:
+You can deploy `ev-battery-soh` directly as a **Portainer Stack**:
+1. Open your Portainer Web UI.
+2. Navigate to **Stacks** &rarr; **Add stack**.
+3. Choose **Repository** (Point to `https://github.com/smilebob/ev-battery-experts` with compose path `portainer-stack.yml`) or select **Web editor** and paste the contents of [`portainer-stack.yml`](file:///home/pierre/Projets/SOH/portainer-stack.yml).
+4. (Optional) Set the environment variable `SOH_JWT_SECRET` with your secret key.
+5. Click **Deploy the stack**.
+6. Access the application on `http://<your-server-ip>:8000`.
+
+---
+
+## 🏗️ 9. Automated CI/CD & Multi-Arch Docker Builds
+
+The project includes an automated GitHub Actions pipeline (`.github/workflows/docker-publish.yml`).
+
+* **Trigger**: Automatically executes whenever a new Release is published on GitHub (or manually via *workflow_dispatch*).
+* **Multi-Architecture**: Compiles and pushes dual architecture images (`linux/amd64` and `linux/arm64`) using Docker Buildx and QEMU.
+* **Registry**: Published automatically to GitHub Container Registry:
+  `ghcr.io/smilebob/ev-battery-experts:latest` and tagged release versions (e.g., `:v0.1.0`).
 * **Public Interface (`http://localhost:8000`)**: Web drag-and-drop CSV upload, VIN entry, interactive SOH visualization, and direct downloads of signed PDF certificates and HTML reports.
 * **Admin Dashboard (`http://localhost:8000/admin`)**:
   * Default Credentials: Username `admin` / Password `admin1234` *(prompted to update on first login)*.

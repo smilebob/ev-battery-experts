@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  ev-battery-soh:
+    image: ghcr.io/smilebob/ev-battery-experts:latest
+    container_name: ev_battery_soh
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SOH_DATA_DIR=/app/data
+      - SOH_JWT_SECRET=${SOH_JWT_SECRET:-generate_a_secure_random_jwt_secret_here}
+    volumes:
+      - ev_soh_data:/app/data
+      - ev_soh_keys:/root/.config/ev-battery-soh/keys
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  ev_soh_data:
+    name: ev_soh_data
+  ev_soh_keys:
+    name: ev_soh_keys

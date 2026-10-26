@@ -42,7 +42,18 @@ ev-battery-soh "/path/to/charges.csv" --lang es -o informe.html
    * Projects future capacity and SOH milestones (+1 yr, +2 yr, +3 yr, up to `--forecast-years`).
    * Visualizes the future trajectory on Plotly charts with a dashed projection line and expanding 95% uncertainty cone.
 
-4. **Executive & Modern Multilingual HTML/PDF Report**:
+4. **Official Tamper-Evident & Signed PDF Certificate**:
+   * Generates a standalone, vector PDF inspection certificate with ReportLab.
+   * Signed with **ECDSA P-256** and SHA-256 (supports custom user private key or auto-generated agent key).
+   * Encodes verifiable payload into an embedded high-resolution **QR-Code**.
+   * Instant verification via `--verify-token` CLI or mobile scanner.
+
+5. **Standalone Web Portal & Portainer Docker Stack**:
+   * Complete web application powered by **FastAPI** (`http://localhost:8000`).
+   * Authenticated Admin dashboard for runtime physical tuning, ECDSA key management, and multi-user access (bcrypt/JWT).
+   * Deployable via Docker Compose and Portainer Stacks (`portainer-stack.yml`) with automated multi-arch GitHub Actions image builds.
+
+6. **Executive & Modern Multilingual HTML Report**:
    * Languages: English (`--lang en`), French (`--lang fr`), Spanish (`--lang es`).
    * Interactive Plotly charts (zoom, hover tooltips, responsive).
    * Certified Quarterly breakdown table with 1 to 5 star reliability ratings (★).
@@ -55,14 +66,15 @@ ev-battery-soh "/path/to/charges.csv" --lang es -o informe.html
 
 * `-o`, `--output`: Output HTML report filepath (default: `battery_soh_report.html`).
 * `-l`, `--lang`: Report language: `en`, `fr`, or `es` (default: `en`).
+* `--vin`: Vehicle Identification Number (VIN - 17 alphanumeric characters, ISO 3779 standard).
+* `--pdf-certificate`: Generate an official, tamper-evident, cryptographically signed inspection PDF certificate with embedded QR-Code.
+* `--private-key`: Custom ECDSA/RSA private key PEM file for signing (default: autonomous local agent key).
+* `--verify-token`: Cryptographically verifies the authenticity of a certificate URI or QR payload.
 * `--annual-km`: Projected annual driving distance in km (default: automatically computed from odometer logs).
 * `--forecast-years`: Number of years to project forward (default: `3`).
-* `--certificate`, `-c`: Generate a tamper-evident certified battery inspection sheet (e.g. `cert.html`).
+* `--certificate`, `-c`: Generate a tamper-evident certified battery inspection sheet HTML (e.g. `cert.html`).
 * `--min-delta`: Minimum battery state of charge variation $\Delta\%$ required to qualify a session (default: `40.0`).
-* `-m`, `--mapping`: Custom column override for unconventional CSV headers:
-  ```bash
-  ev-battery-soh data.csv -m date=timestamp energy_added=charge_kwh soc_start=initial_soc soc_end=final_soc odometer=km_counter
-  ```
+* `-m`, `--mapping`: Custom column override for unconventional CSV headers.
 
 ---
 
