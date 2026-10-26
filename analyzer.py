@@ -921,6 +921,10 @@ class SOHAnalyzer:
                 <span class="label">{{ t.meta_mileage }}</span>
                 <span class="val">{{ "{:,.0f}".format(result.odometer_max) }} km</span>
             </div>
+            <div class="meta-item">
+                <span class="label">{{ t.meta_annual_km }}</span>
+                <span class="val">{{ "{:,.0f}".format(result.annual_km) }} {% if lang == 'en' %}km/year{% elif lang == 'es' %}km/año{% else %}km/an{% endif %}</span>
+            </div>
         </div>
     </div>
 
