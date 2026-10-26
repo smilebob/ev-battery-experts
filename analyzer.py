@@ -1,8 +1,11 @@
 """
 EV Battery State of Health (SOH) and Capacity Degradation Analyzer
 Supports multilingual reporting: English (en), French (fr), Spanish (es).
-Includes electrochemical degradation modeling (SEI growth ∝ √t + cyclic wear ∝ km)
-and predictive future forecasting.
+Includes refined electrochemical degradation modeling:
+ - Arrhenius thermal acceleration (Temp column)
+ - DC fast-charging stress severity factor (Type column)
+ - Preferential statistical weighting for 100% calibration sessions
+ - Multi-scenario forecasting (Optimistic, Realistic, Severe)
 """
 
 from dataclasses import dataclass, field
@@ -23,20 +26,22 @@ COLUMN_SYNONYMS = {
     "soc_end": ["% end", "soc_end", "end_soc", "battery_end", "soc_final", "%_end", "end_pct", "bateria_fin"],
     "odometer": ["odometer", "odo", "km", "mileage", "kilometrage", "compteur", "kilometraje", "odometro"],
     "location": ["location", "station", "lieu", "charge_location", "ubicacion"],
-    "charge_type": ["type", "charge_type", "fast_charge", "ac_dc", "tipo"]
+    "charge_type": ["type", "charge_type", "fast_charge", "ac_dc", "tipo"],
+    "temperature": ["temp", "temperature", "ambient_temp", "battery_temp", "temperatura"]
 }
 
 
 @dataclass
-class ForecastPoint:
+class ScenarioMilestone:
     horizon_label: str
     target_date: datetime
     projected_odometer: float
-    projected_capacity: float
-    projected_capacity_err: float
-    projected_soh: float
-    projected_soh_err: float
-    total_degradation_pct: float
+    cap_optimistic: float
+    soh_optimistic: float
+    cap_realistic: float
+    soh_realistic: float
+    cap_severe: float
+    soh_severe: float
 
 
 @dataclass
@@ -44,6 +49,9 @@ class SOHResult:
     analysis_date: datetime
     total_charges: int
     qualified_charges: int
+    dc_charges_count: int
+    dc_energy_pct: float
+    mean_temperature: float
     odometer_min: float
     odometer_max: float
     date_min: datetime
@@ -56,7 +64,7 @@ class SOHResult:
     current_soh_err: float
     total_degradation_pct: float
     annual_km: float
-    forecast_points: List[ForecastPoint]
+    scenario_milestones: List[ScenarioMilestone]
     quarterly_data: List[Dict[str, Any]]
     df_filtered: pd.DataFrame
     model_details: Dict[str, Any]
@@ -111,6 +119,8 @@ class SOHAnalyzer:
             return series.astype(float)
         cleaned = series.astype(str).str.replace("%", "", regex=False)
         cleaned = cleaned.str.replace("km", "", regex=False)
+        cleaned = cleaned.str.replace("°C", "", regex=False)
+        cleaned = cleaned.str.replace("C", "", regex=False)
         cleaned = cleaned.str.replace(" ", "", regex=False)
         cleaned = cleaned.str.replace(",", ".", regex=False)
         return pd.to_numeric(cleaned, errors="coerce")
@@ -120,9 +130,7 @@ class SOHAnalyzer:
         col_map = self.detect_columns(df)
 
         clean_df = pd.DataFrame()
-        date_series = pd.to_datetime(df[col_map["date"]], dayfirst=True, errors="coerce")
-        clean_df["date"] = date_series
-
+        clean_df["date"] = pd.to_datetime(df[col_map["date"]], dayfirst=True, errors="coerce")
         clean_df["energy_added"] = self.parse_numeric(df[col_map["energy_added"]])
         clean_df["soc_start"] = self.parse_numeric(df[col_map["soc_start"]])
         clean_df["soc_end"] = self.parse_numeric(df[col_map["soc_end"]])
@@ -138,9 +146,14 @@ class SOHAnalyzer:
             clean_df["location"] = "Unknown"
 
         if "charge_type" in col_map:
-            clean_df["charge_type"] = df[col_map["charge_type"]].astype(str)
+            clean_df["charge_type"] = df[col_map["charge_type"]].astype(str).str.upper()
         else:
-            clean_df["charge_type"] = "AC/DC"
+            clean_df["charge_type"] = "AC"
+
+        if "temperature" in col_map:
+            clean_df["temperature"] = self.parse_numeric(df[col_map["temperature"]])
+        else:
+            clean_df["temperature"] = np.nan
 
         clean_df = clean_df.dropna(subset=["date", "energy_added", "soc_start", "soc_end"])
         clean_df["delta_soc"] = clean_df["soc_end"] - clean_df["soc_start"]
@@ -151,59 +164,75 @@ class SOHAnalyzer:
         return clean_df
 
     def _local_weighted_regression(
-        self, x: np.ndarray, y: np.ndarray, x_eval: np.ndarray, bandwidth: float
+        self, x: np.ndarray, y: np.ndarray, x_eval: np.ndarray, bandwidth: float, point_weights: Optional[np.ndarray] = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         y_fit = np.zeros_like(x_eval, dtype=float)
         y_std = np.zeros_like(x_eval, dtype=float)
 
+        if point_weights is None:
+            point_weights = np.ones_like(x)
+
         for i, target_x in enumerate(x_eval):
             diff = x - target_x
-            weights = np.exp(-0.5 * (diff / bandwidth) ** 2)
-            w_sum = np.sum(weights)
+            gauss_w = np.exp(-0.5 * (diff / bandwidth) ** 2)
+            combined_w = gauss_w * point_weights
+            w_sum = np.sum(combined_w)
             if w_sum < 1e-6:
                 y_fit[i] = np.mean(y)
                 y_std[i] = np.std(y)
                 continue
 
-            W = np.diag(weights)
+            W = np.diag(combined_w)
             X_mat = np.column_stack([np.ones_like(diff), diff])
             try:
                 beta = np.linalg.pinv(X_mat.T @ W @ X_mat) @ (X_mat.T @ W @ y)
                 y_fit[i] = beta[0]
                 residuals = y - (beta[0] + beta[1] * diff)
-                eff_n = (w_sum**2) / np.sum(weights**2)
-                var = np.sum(weights * (residuals**2)) / max(1e-6, (w_sum * (1 - 1 / max(eff_n, 2))))
+                eff_n = (w_sum**2) / np.sum(combined_w**2)
+                var = np.sum(combined_w * (residuals**2)) / max(1e-6, (w_sum * (1 - 1 / max(eff_n, 2))))
                 y_std[i] = np.sqrt(max(0.05, var))
             except Exception:
-                y_fit[i] = np.average(y, weights=weights)
+                y_fit[i] = np.average(y, weights=combined_w)
                 y_std[i] = np.std(y)
 
         return y_fit, y_std
 
+    def _compute_arrhenius_factor(self, temp_celsius: float) -> float:
+        """
+        Arrhenius thermal acceleration factor for SEI growth.
+        Reference temperature T_ref = 20°C (293.15 K).
+        Activation energy Ea ~ 50 kJ/mol (typical for graphite/LFP passivation).
+        """
+        T_ref = 293.15
+        T_kelvin = 273.15 + np.clip(temp_celsius, 5.0, 45.0)
+        R = 8.314  # J / (mol*K)
+        E_a = 50000.0  # J/mol
+        # k(T) / k(T_ref) = exp(-Ea/R * (1/T - 1/T_ref))
+        factor = np.exp(- (E_a / R) * (1.0 / T_kelvin - 1.0 / T_ref))
+        return float(np.clip(factor, 0.5, 2.5))
+
     def _fit_electrochemical_model(
-        self, t_years: np.ndarray, km_total: np.ndarray, cap_observed: np.ndarray, c0: float
+        self, t_years: np.ndarray, km_total: np.ndarray, cap_observed: np.ndarray, c0: float,
+        dc_ratio: float, mean_temp: float, weights: np.ndarray
     ) -> Tuple[float, float]:
         """
-        Fits C(t, km) = C0 - (alpha * sqrt(t) + beta * km)
-        where alpha = SEI passivation growth rate (calendar aging)
-              beta = cyclic loss per km (cycling wear)
+        Fits C(t, km) = C0 - (alpha * sqrt(t) * arrh_factor + beta * (1 + 1.8 * dc_ratio) * km)
         """
-        # Loss in kWh
         loss = np.maximum(0.0, c0 - cap_observed)
-        # Features matrix: [sqrt(t), km]
-        feat_sei = np.sqrt(np.maximum(0.01, t_years))
-        feat_km = km_total
+        arrh_factor = self._compute_arrhenius_factor(mean_temp)
+
+        feat_sei = np.sqrt(np.maximum(0.01, t_years)) * arrh_factor
+        dc_stress = 1.0 + 1.8 * np.clip(dc_ratio, 0.0, 1.0)
+        feat_km = km_total * dc_stress
 
         X = np.column_stack([feat_sei, feat_km])
-        # Non-negative least squares or bounded ridge regression
+        W = np.diag(weights)
+
         try:
-            # Linear regression without intercept (loss is 0 at t=0, km=0)
-            res = np.linalg.lstsq(X, loss, rcond=None)[0]
+            res = np.linalg.pinv(X.T @ W @ X) @ (X.T @ W @ loss)
             alpha, beta = float(res[0]), float(res[1])
-            # Physical bounds check for LFP chemistry
             if alpha < 0 or beta < 0:
-                # Fallback to dominant calendar SEI aging
-                alpha = float(np.mean(loss / feat_sei))
+                alpha = float(np.average(loss / np.maximum(0.01, feat_sei), weights=weights))
                 beta = 0.0
         except Exception:
             alpha = 1.2
@@ -231,6 +260,9 @@ class SOHAnalyzer:
 
         df_filtered["soh_raw"] = (df_filtered["capacity_raw"] / initial_capacity) * 100.0
 
+        # Statistical prioritization: Charges ending at 100% receive weight 2.5 (BMS high-voltage calibrated)
+        calibrated_100_weights = np.where(df_filtered["soc_end"] >= 99.0, 2.5, 1.0)
+
         # Time features
         t_timestamps = df_filtered["date"].map(pd.Timestamp.timestamp).values
         t_days = (t_timestamps - t_timestamps[0]) / 86400.0
@@ -240,7 +272,9 @@ class SOHAnalyzer:
         eval_days = np.linspace(t_days[0], t_days[-1], 200)
         eval_dates = [datetime.fromtimestamp(t_timestamps[0] + d * 86400.0) for d in eval_days]
 
-        cap_fit, cap_std = self._local_weighted_regression(t_days, y_cap, eval_days, bandwidth_days)
+        cap_fit, cap_std = self._local_weighted_regression(
+            t_days, y_cap, eval_days, bandwidth_days, point_weights=calibrated_100_weights
+        )
 
         current_capacity = float(cap_fit[-1])
         current_capacity_err = float(1.96 * cap_std[-1])
@@ -248,6 +282,15 @@ class SOHAnalyzer:
         current_soh = (current_capacity / initial_capacity) * 100.0
         current_soh_err = (current_capacity_err / initial_capacity) * 100.0
         total_degradation = 100.0 - current_soh
+
+        # Telemetry metrics: DC fast-charging ratio & ambient temperature
+        total_energy = df_raw["energy_added"].sum()
+        dc_energy = df_raw[df_raw["charge_type"] == "DC"]["energy_added"].sum()
+        dc_energy_pct = float((dc_energy / total_energy * 100.0) if total_energy > 0 else 0.0)
+        dc_charges_count = int((df_raw["charge_type"] == "DC").sum())
+
+        valid_temps = df_raw["temperature"].dropna()
+        mean_temperature = float(valid_temps.mean()) if len(valid_temps) > 0 else 20.0
 
         # Odometer & Annual km calculation
         has_odometer = df_filtered["odometer"].notna().sum() > len(df_filtered) * 0.6
@@ -265,61 +308,96 @@ class SOHAnalyzer:
 
         current_odometer = float(df_filtered["odometer"].max()) if has_odometer else 0.0
 
-        # Electrochemical model fitting: C = C0 - (alpha * sqrt(t) + beta * km)
+        # Fit refined electrochemical model
         t_years_series = t_days / 365.25
         km_series = (df_filtered["odometer"].values - df_filtered["odometer"].min()) if has_odometer else (t_years_series * annual_km)
-        alpha, beta = self._fit_electrochemical_model(t_years_series, km_series, y_cap, initial_capacity)
+        alpha, beta = self._fit_electrochemical_model(
+            t_years_series, km_series, y_cap, initial_capacity,
+            dc_ratio=dc_energy_pct / 100.0, mean_temp=mean_temperature, weights=calibrated_100_weights
+        )
 
-        # Future forecasting
-        last_date = df_filtered["date"].max()
-        forecast_points: List[ForecastPoint] = []
-        forecast_dates_dense: List[datetime] = []
-        forecast_cap_dense: List[float] = []
-        forecast_upper_dense: List[float] = []
-        forecast_lower_dense: List[float] = []
-
-        # Current calibration offset so prediction starts smoothly from current_capacity
-        current_model_cap = initial_capacity - (alpha * np.sqrt(total_years) + beta * (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)))
+        # Baseline offset so predictions seamlessly originate from current_capacity
+        arrh_hist = self._compute_arrhenius_factor(mean_temperature)
+        dc_stress_hist = 1.0 + 1.8 * (dc_energy_pct / 100.0)
+        current_model_cap = initial_capacity - (
+            alpha * np.sqrt(total_years) * arrh_hist + beta * dc_stress_hist * (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0))
+        )
         offset = current_capacity - current_model_cap
 
-        # Dense evaluation points for smooth chart line
+        # 3 SCENARIO FORECASTING
+        # Scenario 1: Optimistic (Preserved home AC, DC ratio ~ 2%, mild temperature)
+        # Scenario 2: Realistic (Historical baseline: historical DC ratio & historical temp)
+        # Scenario 3: Severe (Intensive highway DC ~ 45%, higher thermal stress)
+        scen_configs = {
+            "optimistic": {
+                "arrh": self._compute_arrhenius_factor(min(mean_temperature, 18.0)),
+                "dc_stress": 1.0 + 1.8 * 0.02,
+                "annual_km": annual_km
+            },
+            "realistic": {
+                "arrh": arrh_hist,
+                "dc_stress": dc_stress_hist,
+                "annual_km": annual_km
+            },
+            "severe": {
+                "arrh": self._compute_arrhenius_factor(max(mean_temperature, 28.0)),
+                "dc_stress": 1.0 + 1.8 * 0.45,
+                "annual_km": annual_km * 1.15
+            }
+        }
+
+        last_date = df_filtered["date"].max()
         dense_days = np.linspace(0, self.forecast_years * 365.25, 100)
+
+        forecast_dense: Dict[str, List[float]] = {"optimistic": [], "realistic": [], "severe": []}
+        forecast_dates_dense: List[datetime] = []
+
         for d in dense_days:
             f_date = last_date + timedelta(days=float(d))
-            t_f = total_years + (d / 365.25)
-            km_f = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (d / 365.25) * annual_km
-            pred_cap = initial_capacity - (alpha * np.sqrt(t_f) + beta * km_f) + offset
-            # Uncertainty expands slightly with horizon
-            uncert = current_capacity_err * np.sqrt(1.0 + 0.35 * (d / 365.25))
-
             forecast_dates_dense.append(f_date)
-            forecast_cap_dense.append(pred_cap)
-            forecast_upper_dense.append(pred_cap + uncert)
-            forecast_lower_dense.append(pred_cap - uncert)
+            t_f = total_years + (d / 365.25)
 
-        # Milestone annual points (+1 yr, +2 yr, +3 yr, ...)
+            for s_name, s_cfg in scen_configs.items():
+                km_f = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (d / 365.25) * s_cfg["annual_km"]
+                cap_s = initial_capacity - (
+                    alpha * np.sqrt(t_f) * s_cfg["arrh"] + beta * s_cfg["dc_stress"] * km_f
+                ) + offset
+                forecast_dense[s_name].append(cap_s)
+
+        # Annual milestones table
+        scenario_milestones: List[ScenarioMilestone] = []
         for yr in range(1, self.forecast_years + 1):
             target_dt = last_date + timedelta(days=int(yr * 365.25))
             t_f = total_years + yr
             proj_odo = current_odometer + (yr * annual_km)
-            km_delta = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + (yr * annual_km)
-            pred_cap = initial_capacity - (alpha * np.sqrt(t_f) + beta * km_delta) + offset
-            uncert = current_capacity_err * np.sqrt(1.0 + 0.35 * yr)
-            pred_soh = (pred_cap / initial_capacity) * 100.0
-            pred_soh_err = (uncert / initial_capacity) * 100.0
-            deg_pct = 100.0 - pred_soh
+
+            # Optimistic
+            km_opt = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["optimistic"]["annual_km"]
+            cap_opt = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["optimistic"]["arrh"] + beta * scen_configs["optimistic"]["dc_stress"] * km_opt) + offset
+            soh_opt = (cap_opt / initial_capacity) * 100.0
+
+            # Realistic
+            km_real = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["realistic"]["annual_km"]
+            cap_real = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["realistic"]["arrh"] + beta * scen_configs["realistic"]["dc_stress"] * km_real) + offset
+            soh_real = (cap_real / initial_capacity) * 100.0
+
+            # Severe
+            km_sev = (current_odometer - (df_filtered['odometer'].min() if has_odometer else 0.0)) + yr * scen_configs["severe"]["annual_km"]
+            cap_sev = initial_capacity - (alpha * np.sqrt(t_f) * scen_configs["severe"]["arrh"] + beta * scen_configs["severe"]["dc_stress"] * km_sev) + offset
+            soh_sev = (cap_sev / initial_capacity) * 100.0
 
             label = f"+{yr} yr" if self.lang == "en" else (f"+{yr} an" if self.lang == "fr" else f"+{yr} año")
-            forecast_points.append(
-                ForecastPoint(
+            scenario_milestones.append(
+                ScenarioMilestone(
                     horizon_label=label,
                     target_date=target_dt,
                     projected_odometer=proj_odo,
-                    projected_capacity=round(pred_cap, 2),
-                    projected_capacity_err=round(uncert, 2),
-                    projected_soh=round(pred_soh, 2),
-                    projected_soh_err=round(pred_soh_err, 2),
-                    total_degradation_pct=round(deg_pct, 2),
+                    cap_optimistic=round(cap_opt, 2),
+                    soh_optimistic=round(soh_opt, 2),
+                    cap_realistic=round(cap_real, 2),
+                    soh_realistic=round(soh_real, 2),
+                    cap_severe=round(cap_sev, 2),
+                    soh_severe=round(soh_sev, 2),
                 )
             )
 
@@ -372,6 +450,9 @@ class SOHAnalyzer:
             analysis_date=datetime.now(),
             total_charges=len(df_raw),
             qualified_charges=len(df_filtered),
+            dc_charges_count=dc_charges_count,
+            dc_energy_pct=round(dc_energy_pct, 1),
+            mean_temperature=round(mean_temperature, 1),
             odometer_min=float(df_filtered["odometer"].min()) if has_odometer else 0.0,
             odometer_max=float(df_filtered["odometer"].max()) if has_odometer else 0.0,
             date_min=df_filtered["date"].min(),
@@ -384,7 +465,7 @@ class SOHAnalyzer:
             current_soh_err=current_soh_err,
             total_degradation_pct=total_degradation,
             annual_km=annual_km,
-            forecast_points=forecast_points,
+            scenario_milestones=scenario_milestones,
             quarterly_data=quarterly_list,
             df_filtered=df_filtered,
             min_delta_soc=self.min_delta_soc,
@@ -397,12 +478,12 @@ class SOHAnalyzer:
                 "soh_upper": [round(((v + 1.96 * s) / initial_capacity) * 100.0, 2) for v, s in zip(cap_fit, cap_std)],
                 "soh_lower": [round(((v - 1.96 * s) / initial_capacity) * 100.0, 2) for v, s in zip(cap_fit, cap_std)],
                 "forecast_dates": [d.strftime("%Y-%m-%d") for d in forecast_dates_dense],
-                "forecast_cap": [round(v, 2) for v in forecast_cap_dense],
-                "forecast_cap_upper": [round(v, 2) for v in forecast_upper_dense],
-                "forecast_cap_lower": [round(v, 2) for v in forecast_lower_dense],
-                "forecast_soh": [round((v / initial_capacity) * 100.0, 2) for v in forecast_cap_dense],
-                "forecast_soh_upper": [round((v / initial_capacity) * 100.0, 2) for v in forecast_upper_dense],
-                "forecast_soh_lower": [round((v / initial_capacity) * 100.0, 2) for v in forecast_lower_dense],
+                "forecast_cap_opt": [round(v, 2) for v in forecast_dense["optimistic"]],
+                "forecast_cap_real": [round(v, 2) for v in forecast_dense["realistic"]],
+                "forecast_cap_sev": [round(v, 2) for v in forecast_dense["severe"]],
+                "forecast_soh_opt": [round((v / initial_capacity) * 100.0, 2) for v in forecast_dense["optimistic"]],
+                "forecast_soh_real": [round((v / initial_capacity) * 100.0, 2) for v in forecast_dense["realistic"]],
+                "forecast_soh_sev": [round((v / initial_capacity) * 100.0, 2) for v in forecast_dense["severe"]],
                 "has_odometer": has_odometer,
                 "odo_eval": [round(v, 0) for v in odo_eval] if odo_eval is not None else [],
                 "cap_fit_odo": [round(v, 2) for v in cap_fit_odo] if cap_fit_odo is not None else [],
@@ -417,9 +498,9 @@ class SOHAnalyzer:
         m = result.model_details
         t = self.t
 
-        # 1. Capacity vs Time (Historical + Forecast)
+        # 1. Capacity vs Time (Historical + 3 Scenarios)
         fig_cap_time = go.Figure()
-        # Historical confidence band
+        # Historical uncertainty band
         fig_cap_time.add_trace(go.Scatter(
             x=m["eval_dates"] + m["eval_dates"][::-1],
             y=m["cap_upper"] + m["cap_lower"][::-1],
@@ -427,16 +508,6 @@ class SOHAnalyzer:
             fillcolor="rgba(14, 165, 233, 0.15)",
             line=dict(color="rgba(255,255,255,0)"),
             name=t["chart_cap_ci"],
-            hoverinfo="skip"
-        ))
-        # Forecast confidence band
-        fig_cap_time.add_trace(go.Scatter(
-            x=m["forecast_dates"] + m["forecast_dates"][::-1],
-            y=m["forecast_cap_upper"] + m["forecast_cap_lower"][::-1],
-            fill="toself",
-            fillcolor="rgba(249, 115, 22, 0.12)",
-            line=dict(color="rgba(255,255,255,0)"),
-            name=t["chart_cap_forecast_ci"],
             hoverinfo="skip"
         ))
         # Historical trend line
@@ -447,15 +518,31 @@ class SOHAnalyzer:
             line=dict(color="#0284c7", width=3),
             name=t["chart_cap_trend"]
         ))
-        # Forecast projection line (dashed)
+        # Scenario Optimistic
         fig_cap_time.add_trace(go.Scatter(
             x=m["forecast_dates"],
-            y=m["forecast_cap"],
+            y=m["forecast_cap_opt"],
             mode="lines",
-            line=dict(color="#ea580c", width=3, dash="dash"),
-            name=t["chart_cap_forecast"]
+            line=dict(color="#10b981", width=2.5, dash="dot"),
+            name=t["chart_cap_scen_optimistic"]
         ))
-        # Raw data points
+        # Scenario Realistic
+        fig_cap_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_cap_real"],
+            mode="lines",
+            line=dict(color="#f97316", width=3, dash="dash"),
+            name=t["chart_cap_scen_realistic"]
+        ))
+        # Scenario Severe
+        fig_cap_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_cap_sev"],
+            mode="lines",
+            line=dict(color="#ef4444", width=2.5, dash="dashdot"),
+            name=t["chart_cap_scen_severe"]
+        ))
+        # Observed points
         fig_cap_time.add_trace(go.Scatter(
             x=df["date"],
             y=df["capacity_raw"],
@@ -475,7 +562,7 @@ class SOHAnalyzer:
         )
         figs["capacity_time"] = fig_cap_time
 
-        # 2. SOH vs Time (Historical + Forecast)
+        # 2. SOH vs Time (Historical + 3 Scenarios)
         fig_soh_time = go.Figure()
         # Historical band
         fig_soh_time.add_trace(go.Scatter(
@@ -487,16 +574,6 @@ class SOHAnalyzer:
             name=t["chart_cap_ci"],
             hoverinfo="skip"
         ))
-        # Forecast band
-        fig_soh_time.add_trace(go.Scatter(
-            x=m["forecast_dates"] + m["forecast_dates"][::-1],
-            y=m["forecast_soh_upper"] + m["forecast_soh_lower"][::-1],
-            fill="toself",
-            fillcolor="rgba(249, 115, 22, 0.12)",
-            line=dict(color="rgba(255,255,255,0)"),
-            name=t["chart_cap_forecast_ci"],
-            hoverinfo="skip"
-        ))
         # Historical trend
         fig_soh_time.add_trace(go.Scatter(
             x=m["eval_dates"],
@@ -505,15 +582,31 @@ class SOHAnalyzer:
             line=dict(color="#059669", width=3),
             name=t["chart_soh_trend"]
         ))
-        # Forecast trend
+        # SOH Optimistic
         fig_soh_time.add_trace(go.Scatter(
             x=m["forecast_dates"],
-            y=m["forecast_soh"],
+            y=m["forecast_soh_opt"],
             mode="lines",
-            line=dict(color="#ea580c", width=3, dash="dash"),
-            name=t["chart_soh_forecast"]
+            line=dict(color="#10b981", width=2.5, dash="dot"),
+            name=t["chart_soh_scen_optimistic"]
         ))
-        # Raw points
+        # SOH Realistic
+        fig_soh_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_soh_real"],
+            mode="lines",
+            line=dict(color="#f97316", width=3, dash="dash"),
+            name=t["chart_soh_scen_realistic"]
+        ))
+        # SOH Severe
+        fig_soh_time.add_trace(go.Scatter(
+            x=m["forecast_dates"],
+            y=m["forecast_soh_sev"],
+            mode="lines",
+            line=dict(color="#ef4444", width=2.5, dash="dashdot"),
+            name=t["chart_soh_scen_severe"]
+        ))
+        # Observed points
         fig_soh_time.add_trace(go.Scatter(
             x=df["date"],
             y=df["soh_raw"],
@@ -522,7 +615,7 @@ class SOHAnalyzer:
             name=t["chart_soh_points"],
             hovertemplate="<b>" + t["axis_date"] + "</b>: %{x|%Y-%m-%d}<br><b>" + t["axis_soh"] + "</b>: %{y:.2f} %<extra></extra>"
         ))
-        min_soh_plot = min(min(m["soh_lower"]), min(m["forecast_soh_lower"]))
+        min_soh_plot = min(min(m["soh_lower"]), min(m["forecast_soh_sev"]))
         fig_soh_time.update_layout(
             title=t["chart_soh_title"],
             xaxis_title=t["axis_date"],
@@ -581,9 +674,8 @@ class SOHAnalyzer:
         chart_soh_time_html = figs["soh_time"].to_html(full_html=False, include_plotlyjs=False)
         chart_odo_html = figs["capacity_odometer"].to_html(full_html=False, include_plotlyjs=False) if "capacity_odometer" in figs else ""
 
-        # Average annual SOH loss in forecast
-        final_fp = result.forecast_points[-1]
-        annual_loss = round((result.current_soh - final_fp.projected_soh) / len(result.forecast_points), 2)
+        final_sm = result.scenario_milestones[-1]
+        annual_loss = round((result.current_soh - final_sm.soh_realistic) / len(result.scenario_milestones), 2)
 
         html_template = """<!DOCTYPE html>
 <html lang="{{ lang }}">
@@ -597,7 +689,8 @@ class SOHAnalyzer:
             --primary-light: #1e293b;
             --accent: #0284c7;
             --success: #059669;
-            --warning: #ea580c;
+            --warning: #f97316;
+            --danger: #ef4444;
             --border: #e2e8f0;
             --bg-card: #ffffff;
             --bg-page: #f8fafc;
@@ -758,6 +851,17 @@ class SOHAnalyzer:
         tr:hover td {
             background-color: #f8fafc;
         }
+        .scen-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            margin-bottom: 4px;
+        }
+        .scen-badge.opt { background: #dcfce7; color: #15803d; }
+        .scen-badge.real { background: #ffedd5; color: #c2410c; }
+        .scen-badge.sev { background: #fee2e2; color: #b91c1c; }
         .star-rating {
             color: #f59e0b;
             font-size: 1rem;
@@ -811,7 +915,7 @@ class SOHAnalyzer:
             </div>
             <div class="meta-item">
                 <span class="label">{{ t.meta_sessions }}</span>
-                <span class="val">{{ t.sessions_qualified.format(qualified=result.qualified_charges, total=result.total_charges) }}</span>
+                <span class="val">{{ t.sessions_qualified.format(qualified=result.qualified_charges, total=result.total_charges, dc_pct=result.dc_energy_pct) }}</span>
             </div>
             <div class="meta-item">
                 <span class="label">{{ t.meta_mileage }}</span>
@@ -865,37 +969,55 @@ class SOHAnalyzer:
     </div>
     {% endif %}
 
-    <!-- FORECAST SECTION -->
+    <!-- MULTI-SCENARIO FORECAST -->
     <div class="section-card">
         <h2>{{ t.sec4_title }}</h2>
-        <p class="section-desc">{{ t.sec4_desc.format(annual_km=result.annual_km|round|int) }}</p>
+        <p class="section-desc">{{ t.sec4_desc.format(mean_temp=result.mean_temperature, dc_pct=result.dc_energy_pct, annual_km=result.annual_km|round|int) }}</p>
         <table>
             <thead>
                 <tr>
                     <th>{{ t.th_horizon }}</th>
                     <th>{{ t.th_target_date }}</th>
                     <th>{{ t.th_proj_km }}</th>
-                    <th>{{ t.th_proj_cap }}</th>
-                    <th>{{ t.th_proj_soh }}</th>
-                    <th>{{ t.th_proj_loss }}</th>
+                    <th>{{ t.th_scen_optimistic }}</th>
+                    <th>{{ t.th_scen_realistic }}</th>
+                    <th>{{ t.th_scen_severe }}</th>
                 </tr>
             </thead>
             <tbody>
-                {% for fp in result.forecast_points %}
+                {% for sm in result.scenario_milestones %}
                 <tr>
-                    <td><strong>{{ fp.horizon_label }}</strong></td>
-                    <td>{{ fp.target_date.strftime('%Y-%m-%d') }}</td>
-                    <td>{{ "{:,.0f}".format(fp.projected_odometer) }} km</td>
-                    <td>{{ "%.2f"|format(fp.projected_capacity) }} ± {{ "%.2f"|format(fp.projected_capacity_err) }} kWh</td>
-                    <td><strong>{{ "%.2f"|format(fp.projected_soh) }}% ± {{ "%.2f"|format(fp.projected_soh_err) }}%</strong></td>
-                    <td>{{ "%.2f"|format(fp.total_degradation_pct) }}%</td>
+                    <td><strong>{{ sm.horizon_label }}</strong></td>
+                    <td>{{ sm.target_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ "{:,.0f}".format(sm.projected_odometer) }} km</td>
+                    <td>
+                        <span class="scen-badge opt">SOH {{ "%.2f"|format(sm.soh_optimistic) }}%</span><br>
+                        {{ "%.2f"|format(sm.cap_optimistic) }} kWh
+                    </td>
+                    <td>
+                        <span class="scen-badge real">SOH {{ "%.2f"|format(sm.soh_realistic) }}%</span><br>
+                        <strong>{{ "%.2f"|format(sm.cap_realistic) }} kWh</strong>
+                    </td>
+                    <td>
+                        <span class="scen-badge sev">SOH {{ "%.2f"|format(sm.soh_severe) }}%</span><br>
+                        {{ "%.2f"|format(sm.cap_severe) }} kWh
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
         <div class="callout forecast">
-            {{ t.forecast_callout.format(annual_loss=annual_loss, end_date=final_fp.target_date.strftime('%Y-%m-%d'), end_soh="%.2f"|format(final_fp.projected_soh), end_soh_err="%.2f"|format(final_fp.projected_soh_err))|safe }}
+            {{ t.forecast_callout.format(
+                dc_pct=result.dc_energy_pct,
+                mean_temp=result.mean_temperature,
+                annual_loss=annual_loss,
+                end_date=final_sm.target_date.strftime('%Y-%m-%d'),
+                end_odo=final_sm.projected_odometer|round|int,
+                soh_optimistic="%.2f"|format(final_sm.soh_optimistic),
+                soh_realistic="%.2f"|format(final_sm.soh_realistic),
+                soh_severe="%.2f"|format(final_sm.soh_severe)
+            )|safe }}
         </div>
     </div>
 
@@ -950,7 +1072,7 @@ class SOHAnalyzer:
             lang=self.lang,
             result=result,
             annual_loss=annual_loss,
-            final_fp=final_fp,
+            final_sm=final_sm,
             chart_cap_time_html=chart_cap_time_html,
             chart_soh_time_html=chart_soh_time_html,
             chart_odo_html=chart_odo_html

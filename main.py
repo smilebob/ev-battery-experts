@@ -2,7 +2,8 @@
 """
 CLI entry point for EV Battery SOH Analysis
 Supports multilingual reporting: English (--lang en), French (--lang fr), Spanish (--lang es).
-Supports future degradation forecasting with custom or auto-detected annual mileage (--annual-km).
+Supports refined multi-scenario degradation forecasting (Optimistic, Realistic, Severe)
+incorporating DC fast-charging ratio, Arrhenius thermal kinetics, and 100% calibration weighting.
 """
 
 import argparse
@@ -93,26 +94,31 @@ def main():
         clean_df = analyzer.load_data(args.csv_path)
         print(f"-> {len(clean_df)} valid charge sessions extracted.")
 
-        print("Computing battery degradation, local regression, and electrochemical future projections...")
+        print("Computing refined electrochemical degradation with Arrhenius thermal kinetics & DC stress factors...")
         result = analyzer.analyze(clean_df)
 
-        print("\n" + "=" * 65)
-        print(f"       BATTERY SOH ASSESSMENT & FORECAST RESULTS ({args.lang.upper()})       ")
-        print("=" * 65)
+        print("\n" + "=" * 70)
+        print(f"       BATTERY SOH ASSESSMENT & MULTI-SCENARIO FORECAST ({args.lang.upper()})       ")
+        print("=" * 70)
         print(f"Period analyzed      : {result.date_min.strftime('%Y-%m-%d')} -> {result.date_max.strftime('%Y-%m-%d')}")
         print(f"Qualified sessions   : {result.qualified_charges} (threshold: Δ% ≥ {args.min_delta}%)")
         if result.odometer_max > 0:
             print(f"Current odometer     : {result.odometer_max:,.0f} km")
+        print(f"DC fast-charge share : {result.dc_energy_pct:.1f}% energy ({result.dc_charges_count} DC sessions)")
+        print(f"Mean charge temp     : {result.mean_temperature:.1f} °C (Arrhenius factor applied)")
         print(f"Baseline capacity C0 : {result.initial_capacity:.2f} kWh")
         print(f"Current capacity     : {result.current_capacity:.2f} ± {result.current_capacity_err:.2f} kWh (95% CI)")
         print(f"Current SOH          : {result.current_soh:.2f}% ± {result.current_soh_err:.2f}%")
         print(f"Total degradation    : {result.total_degradation_pct:.2f}% ({result.initial_capacity - result.current_capacity:.2f} kWh lost)")
-        print("-" * 65)
-        print(f"Assumed Annual Rate  : {result.annual_km:,.0f} km/year" + (" (user override)" if args.annual_km else " (auto historical mean)"))
-        print("ELECTROCHEMICAL FUTURE PROJECTIONS:")
-        for fp in result.forecast_points:
-            print(f"  {fp.horizon_label:8s} ({fp.target_date.strftime('%Y-%m-%d')}) | {fp.projected_odometer:,.0f} km : SOH {fp.projected_soh:.2f}% ± {fp.projected_soh_err:.2f}% (Cap: {fp.projected_capacity:.2f} kWh)")
-        print("=" * 65 + "\n")
+        print("-" * 70)
+        print(f"Projected Annual Rate: {result.annual_km:,.0f} km/year" + (" (user override)" if args.annual_km else " (auto historical mean)"))
+        print("MULTI-SCENARIO PROJECTIONS (Optimistic / Realistic / Severe):")
+        for sm in result.scenario_milestones:
+            print(f"  {sm.horizon_label:8s} ({sm.target_date.strftime('%Y-%m-%d')}) | {sm.projected_odometer:,.0f} km : "
+                  f"Opt: {sm.soh_optimistic:.2f}% ({sm.cap_optimistic:.2f}k) | "
+                  f"Real: {sm.soh_realistic:.2f}% ({sm.cap_realistic:.2f}k) | "
+                  f"Sev: {sm.soh_severe:.2f}% ({sm.cap_severe:.2f}k)")
+        print("=" * 70 + "\n")
 
         print(f"Generating interactive professional HTML report in '{args.lang}'...")
         analyzer.generate_html_report(result, args.output)
