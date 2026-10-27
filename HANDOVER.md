@@ -6,7 +6,7 @@
 **Author:** Pierre Roth (`smilebob`)  
 **License:** BSD 3-Clause License  
 **Last Updated:** October 27, 2026  
-**Current Release:** `v0.1.0` (Builds published on GHCR)  
+**Current Release:** `v0.2.0` (Builds published on GHCR)  
 
 ---
 

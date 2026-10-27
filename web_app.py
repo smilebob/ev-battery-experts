@@ -32,7 +32,7 @@ app = FastAPI(
     title="EV Battery SOH & Inspection Platform API",
     description="REST & OpenAPI 3.1 compliant endpoints for telemetric battery health evaluation, "
                 "electrochemical forecasting, and cryptographically signed PDF certificates.",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json"

@@ -1,6 +1,6 @@
 [project]
 name = "ev-battery-soh"
-version = "0.1.0"
+version = "0.2.0"
 description = "EV Battery SOH and Capacity Degradation Analyzer with interactive reports and AI agent skill"
 readme = "README.md"
 authors = [
