@@ -80,6 +80,25 @@ pip install -e .
 
 ---
 
+## 🐳 Method 3: Containerized Deployment (Docker & Portainer)
+
+The platform provides a production-ready, multi-arch Docker image published on GitHub Container Registry.
+
+### Using Docker Compose:
+```bash
+git clone https://github.com/smilebob/ev-battery-experts.git
+cd ev-battery-experts
+docker compose up -d
+```
+Access the web dashboard at `http://localhost:8000`.
+
+### Deploying via Portainer Stack:
+1. Open Portainer &rarr; **Stacks** &rarr; **Add stack**.
+2. Select **Repository** (URL: `https://github.com/smilebob/ev-battery-experts`, Compose path: `portainer-stack.yml`).
+3. Deploy the stack. The persistent database and cryptographic keys are mounted safely in named volumes.
+
+---
+
 ## 🧪 Verifying Installation
 
 With the environment activated, check the CLI:

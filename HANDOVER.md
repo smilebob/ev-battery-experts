@@ -5,7 +5,8 @@
 **GitHub Repository:** [https://github.com/smilebob/ev-battery-experts](https://github.com/smilebob/ev-battery-experts)  
 **Author:** Pierre Roth (`smilebob`)  
 **License:** BSD 3-Clause License  
-**Last Updated:** October 26, 2026  
+**Last Updated:** October 27, 2026  
+**Current Release:** `v0.1.0` (Builds published on GHCR)  
 
 ---
 
@@ -27,8 +28,15 @@ It processes raw charging session logs without requiring proprietary cloud token
 5. **Certified Deliverables**:
    - Interactive multilingual HTML/PDF reports in **English**, **French**, and **Spanish** (`i18n.py`).
    - Tamper-evident **Battery Health Inspection Certificates** with SHA-256 cryptographic dataset hashing and condition grades (A+ to D) for vehicle resale (`certificate.py`).
+   - Vector PDF certificates generated via ReportLab signed with **ECDSA P-256** and embedded QR-code verification (`pdf_certificate.py`).
 6. **Native Model Context Protocol Server (`mcp_server.py`)**:
-   - Directly exposes battery diagnostic and forecasting tools to AI agents (Antigravity, Claude Desktop, Cursor, etc.).
+   - Upgraded to MCP Python SDK v2 (`mcp.server.mcpserver`), exposing `analyze_battery`, `generate_inspection_certificate`, `verify_certificate`, and `get_vehicle_pack_catalog`.
+7. **Standalone Web Portal & Admin Dashboard (`web_app.py`, `db.py`)**:
+   - FastAPI server with OpenAPI 3.1 specifications (`/docs`, `/redoc`, `/openapi.json`).
+   - Multi-user authentication with bcrypt password hashing (12 rounds) and JWT HS256 sessions.
+   - Dynamic runtime tuning of physical parameters and ECDSA key management.
+8. **Automated Docker & Portainer CI/CD (`.github/workflows/docker-publish.yml`, `portainer-stack.yml`)**:
+   - Dual-architecture automated builds (`linux/amd64`, `linux/arm64`) published to GitHub Container Registry (`ghcr.io/smilebob/ev-battery-experts:latest` and `:v0.1.0`).
 
 ---
 

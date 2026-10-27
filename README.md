@@ -19,15 +19,23 @@ Works seamlessly:
 ev-battery-experts/
 ├── main.py                  # CLI executable entry point
 ├── analyzer.py              # Statistical engine, LOWESS regression, Plotly & Jinja2 report generator
-├── chemistries.py           # Multi-chemistry battery database & vehicle pack catalog (LFP, NMC, NCA)
+├── chemistries.py           # Multi-chemistry battery database & vehicle pack catalog (LFP, NMC, NCA, Na-Ion)
 ├── parsers.py               # Polymorphic data ingestion (TeslaMate, ScanMyTesla, Tronity, Generic)
-├── certificate.py           # Tamper-evident battery health certificate generator with SHA-256
-├── mcp_server.py            # Native Model Context Protocol (MCP) server for AI assistants
+├── pdf_certificate.py       # Official signed PDF inspection certificate generator (ReportLab + QR Code)
+├── crypto_signer.py         # ECDSA P-256 + SHA-256 cryptographic signing & key management engine
+├── verifier.py              # Offline certificate verification & authenticity validator
+├── web_app.py               # Standalone FastAPI web application with OpenAPI 3.1 & REST API
+├── db.py                    # SQLite database models, bcrypt salted password hashing & JWT auth
+├── templates/               # HTML5 & Tailwind CSS responsive UI templates (Public, Admin, Results)
+├── mcp_server.py            # Model Context Protocol (MCP) server for AI assistants
+├── Dockerfile               # Multi-stage lightweight production container
+├── docker-compose.yml       # Local Docker Compose setup with persistent data volumes
+├── portainer-stack.yml      # Portainer stack deployment template using GHCR image
 ├── pyproject.toml           # Standard PEP 517/621 packaging configuration
 ├── LICENSE                  # BSD 3-Clause License
 ├── docs/                    # 📚 Documentation
-│   ├── INSTALLATION.md      # Installation guide (Linux, macOS, Windows, uv, pip)
-│   ├── USAGE.md             # Practical guide, CLI options & CSV formats
+│   ├── INSTALLATION.md      # Installation guide (Linux, macOS, Windows, Docker, uv, pip)
+│   ├── USAGE.md             # Practical guide, CLI options, REST API, Portainer & CSV formats
 │   └── METHODOLOGY.md       # Physical principles & mathematical modeling
 ├── skills/
 │   └── ev-battery-soh/
@@ -90,6 +98,23 @@ ev-battery-soh custom_export.csv \
 ```bash
 ev-battery-soh charges.csv --min-delta 30 -o battery_report.html
 ```
+
+### 4. Signed Official PDF Certificate & VIN
+Generate a sealed inspection certificate for vehicle resale signed with ECDSA P-256 and verified via QR-Code:
+```bash
+ev-battery-soh charges.csv --vin XP7YGCEK7PB123456 --pdf-certificate inspection_certificate.pdf
+```
+
+### 5. Standalone Web Portal & Portainer Deployment
+Launch the interactive web UI and Admin panel:
+```bash
+# Locally:
+uvicorn web_app:app --host 0.0.0.0 --port 8000
+
+# Or via Docker:
+docker compose up -d
+```
+Then visit `http://localhost:8000` (or `http://localhost:8000/docs` for the interactive Swagger OpenAPI documentation).
 
 ---
 
