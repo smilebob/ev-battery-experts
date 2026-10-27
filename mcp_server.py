@@ -1,18 +1,29 @@
 """
-FastMCP Server for EV Battery State of Health (SOH) Analysis
-Exposes battery diagnostic, multi-chemistry pack lookup, forecasting,
-and certificate generation tools via the Model Context Protocol (MCP).
+Official Model Context Protocol (MCP) Server for EV Battery State of Health (SOH) Analysis.
+Built on MCP Python SDK (v2 / MCPServer).
+Exposes tools for:
+  - Battery capacity and SOH degradation analysis (CSV ingestion)
+  - Official signed PDF certificate generation with QR code and SHA-256 seal
+  - Vehicle pack & multi-chemistry catalog lookup
+  - Cryptographic token verification
 """
 
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+from mcp.server.mcpserver import MCPServer
+
 from analyzer import SOHAnalyzer
 from chemistries import VEHICLE_CATALOG, infer_pack_from_capacity
-from certificate import generate_certificate_html
+from pdf_certificate import generate_certified_pdf
+from verifier import verify_certificate_token
+
+# Initialize MCP Server
+mcp = MCPServer(name="ev-battery-soh-server")
 
 
+@mcp.tool()
 def analyze_battery(
     csv_path: str,
     output_html: Optional[str] = None,
@@ -23,8 +34,18 @@ def analyze_battery(
     vin: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Analyzes an EV charging telemetry CSV file, models battery capacity and SOH degradation,
-    evaluates statistical confidence intervals, and optionally generates an interactive report.
+    Analyzes EV charging session telemetry (CSV), filters discretization noise,
+    models capacity degradation using Gaussian local regression (LOWESS) with 95% confidence intervals,
+    and returns comprehensive electrochemical indicators and multi-scenario forecasts.
+
+    Args:
+        csv_path: Absolute or relative path to the charging CSV export.
+        output_html: Optional path to save an interactive Plotly HTML report.
+        lang: Language for reports ('en', 'fr', 'es').
+        annual_km: Optional override for projected annual mileage in km.
+        forecast_years: Number of years for predictive degradation forecasting (default 3).
+        min_delta: Minimum SoC variation % to admit charge session into model (default 40.0).
+        vin: Optional 17-character Vehicle Identification Number.
     """
     path = Path(csv_path)
     if not path.exists():
@@ -88,9 +109,79 @@ def analyze_battery(
     }
 
 
+@mcp.tool()
+def generate_inspection_certificate(
+    csv_path: str,
+    output_pdf_path: str,
+    vin: Optional[str] = None,
+    lang: str = "fr",
+    private_key_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Generates an official, tamper-evident, cryptographically signed battery inspection PDF certificate
+    using ECDSA P-256 and SHA-256 with an embedded verification QR code.
+
+    Args:
+        csv_path: Path to the vehicle charging telemetry CSV.
+        output_pdf_path: Output file path for the signed PDF certificate.
+        vin: Optional 17-character Vehicle Identification Number.
+        lang: Language of the certificate ('fr', 'en', 'es').
+        private_key_path: Optional path to custom ECDSA private key PEM file.
+    """
+    path = Path(csv_path)
+    if not path.exists():
+        return {"error": f"File '{csv_path}' does not exist."}
+
+    analyzer = SOHAnalyzer(lang=lang, vin=vin)
+    clean_df = analyzer.load_data(path)
+    result = analyzer.analyze(clean_df)
+
+    pack_key, pack_info = infer_pack_from_capacity(result.initial_capacity)
+    v_info = {
+        "make": pack_info.make,
+        "model": f"{pack_info.model} {pack_info.variant}",
+        "chemistry": pack_info.chemistry.name
+    }
+
+    pdf_out = Path(output_pdf_path)
+    priv_p = Path(private_key_path) if private_key_path else None
+
+    cert_info = generate_certified_pdf(
+        result=result,
+        csv_file=path,
+        output_pdf_path=pdf_out,
+        vehicle_info=v_info,
+        lang=lang,
+        vin=result.vin,
+        private_key_path=priv_p
+    )
+
+    return {
+        "status": "success",
+        "certificate_id": cert_info["certificate_id"],
+        "pdf_path": cert_info["pdf_path"],
+        "dataset_hash": cert_info["dataset_hash"],
+        "signature_b64": cert_info["signature_b64"],
+        "verification_uri": cert_info["verification_uri"]
+    }
+
+
+@mcp.tool()
+def verify_certificate(token_or_uri: str) -> Dict[str, Any]:
+    """
+    Verifies the cryptographic authenticity and integrity of a certificate URI or QR payload.
+
+    Args:
+        token_or_uri: The verification URI or QR content (e.g. 'ev-soh://verify?id=...&sig=...').
+    """
+    return verify_certificate_token(token_or_uri)
+
+
+@mcp.tool()
 def get_vehicle_pack_catalog() -> Dict[str, Any]:
     """
-    Returns available electric vehicle battery packs, nominal capacities, and chemistry profiles.
+    Returns available electric vehicle battery packs, nominal capacities, and chemistry profiles
+    (LFP, NMC, NCA, Sodium-Ion) for Tesla, Stellantis, Renault, VW Group, MG, Hyundai, and Kia.
     """
     return {
         key: {
@@ -107,8 +198,5 @@ def get_vehicle_pack_catalog() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # Test execution
-    res = analyze_battery(
-        "/home/pierre/.gemini/antigravity/brain/971ff791-e6d6-46ec-9dd1-ffe2e4e62f4a/.user_uploaded/media_1792945222586_550f994e.csv"
-    )
-    print(json.dumps(res, indent=2))
+    # Runs standard stdio MCP transport for AI agent pairing
+    mcp.run()

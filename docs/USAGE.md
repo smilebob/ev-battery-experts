@@ -44,10 +44,12 @@ ev-battery-soh charges.csv --vin XP7YGCEK7PB123456 -c certificate_resale.html
 
 ## 🤖 2. Model Context Protocol (MCP) Integration
 
-The project includes a native MCP server (`mcp_server.py`) exposing battery diagnostics to AI environments (Antigravity, Claude Desktop, Cursor):
+The project includes an up-to-date, native MCP server (`mcp_server.py`) built on the official Model Context Protocol Python SDK (`mcp.server.mcpserver`):
 
 * **Available MCP Tools**:
-  * `analyze_battery`: Analyzes CSV, models degradation, and outputs structured JSON diagnostics.
+  * `analyze_battery`: Analyzes CSV telemetry, models non-parametric degradation, and outputs structured JSON diagnostics and multi-scenario forecasts.
+  * `generate_inspection_certificate`: Produces an official, signed PDF inspection certificate (ECDSA P-256 + SHA-256) with embedded verification QR-Code.
+  * `verify_certificate`: Mathematically authenticates a certificate verification URI or signature token.
   * `get_vehicle_pack_catalog`: Returns nominal capacities and chemistry profiles for all registered EV models.
 
 * **Starting the MCP Server**:
@@ -55,9 +57,37 @@ The project includes a native MCP server (`mcp_server.py`) exposing battery diag
 python3 mcp_server.py
 ```
 
+* **Connecting to Claude Desktop / Cursor / Antigravity**:
+Add to your `mcpServers` configuration:
+```json
+{
+  "mcpServers": {
+    "ev-battery-soh": {
+      "command": "python3",
+      "args": ["/absolute/path/to/mcp_server.py"]
+    }
+  }
+}
+```
+
 ---
 
-## 🗂️ 3. Supported CSV Formats & Auto-Detection
+## 📡 3. REST API & OpenAPI Documentation
+
+The web service natively exposes an **OpenAPI 3.1** specification and interactive Swagger/ReDoc documentations:
+
+* **Interactive Swagger UI**: `http://localhost:8000/docs`
+* **ReDoc Documentation**: `http://localhost:8000/redoc`
+* **Raw OpenAPI JSON**: `http://localhost:8000/openapi.json`
+
+### Core Endpoints:
+* `POST /api/v1/analyze`: Upload a charging CSV (with optional VIN, annual km, and language) to receive full JSON diagnostics, 95% confidence intervals, and future degradation trajectories.
+* `GET /api/v1/vehicles`: Retrieve all registered battery packs (LFP, NMC, NCA, Sodium-Ion) and nominal capacities.
+* `GET /api/v1/verify`: Verify the cryptographic authenticity of a certificate token.
+
+---
+
+## 🗂️ 4. Supported CSV Formats & Auto-Detection
 
 The analyzer features polymorphic ingestion (`parsers.py`) and an intelligent synonym dictionary supporting popular EV telemetry loggers.
 

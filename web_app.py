@@ -22,12 +22,21 @@ from db import (
     DATA_DIR
 )
 from analyzer import SOHAnalyzer
-from chemistries import infer_pack_from_capacity
+from chemistries import infer_pack_from_capacity, VEHICLE_CATALOG
 from certificate import generate_certificate_html
 from pdf_certificate import generate_certified_pdf
 from crypto_signer import get_or_create_default_keypair, export_public_key_pem, ec
+from verifier import verify_certificate_token
 
-app = FastAPI(title="EV Battery SOH Web & Admin Platform")
+app = FastAPI(
+    title="EV Battery SOH & Inspection Platform API",
+    description="REST & OpenAPI 3.1 compliant endpoints for telemetric battery health evaluation, "
+                "electrochemical forecasting, and cryptographically signed PDF certificates.",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -157,7 +166,114 @@ def download_report(filename: str):
 
 
 # -------------------------------------------------------------
-# 2. ADMIN AUTHENTICATION & MANAGEMENT
+# 2. REST API ENDPOINTS (OPENAPI COMPATIBLE)
+# -------------------------------------------------------------
+
+@app.post("/api/v1/analyze", summary="Analyze Battery Telemetry CSV", tags=["Battery Telemetry Analysis"])
+async def api_analyze_battery(
+    file: UploadFile = File(..., description="Charging telemetry CSV export"),
+    vin: Optional[str] = Form(None, description="Optional 17-character VIN"),
+    lang: str = Form("en", description="Language: 'en', 'fr', 'es'"),
+    annual_km: Optional[float] = Form(None, description="Projected annual mileage in km"),
+    forecast_years: int = Form(3, description="Degradation projection horizon in years")
+):
+    """
+    Ingests charging logs, fits Gaussian LOWESS curves, and returns structured SOH metrics,
+    margins of error (95% CI), and multi-scenario projections in JSON format.
+    """
+    with Session(engine) as session:
+        cfg = session.get(AppConfig, 1) or AppConfig()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
+        shutil.copyfileobj(file.file, tmp_csv)
+        tmp_csv_path = Path(tmp_csv.name)
+
+    try:
+        analyzer = SOHAnalyzer(
+            min_delta_soc=cfg.min_delta_soc,
+            lang=lang,
+            annual_km=annual_km,
+            forecast_years=forecast_years,
+            vin=vin.strip().upper() if vin else None
+        )
+        clean_df = analyzer.load_data(tmp_csv_path)
+        result = analyzer.analyze(clean_df)
+        pack_key, pack_info = infer_pack_from_capacity(result.initial_capacity)
+
+        return {
+            "status": "success",
+            "vin": result.vin,
+            "vehicle_pack": {
+                "make": pack_info.make,
+                "model": pack_info.model,
+                "variant": pack_info.variant,
+                "chemistry": pack_info.chemistry.code,
+                "nominal_usable_kwh": pack_info.nominal_usable_kwh,
+                "gross_kwh": pack_info.gross_kwh
+            },
+            "soh_evaluation": {
+                "current_soh_pct": round(result.current_soh, 2),
+                "soh_ci95_err_pct": round(result.current_soh_err, 2),
+                "current_usable_kwh": round(result.current_capacity, 2),
+                "usable_ci95_err_kwh": round(result.current_capacity_err, 2),
+                "factory_baseline_kwh": round(result.initial_capacity, 2),
+                "total_degradation_pct": round(result.total_degradation_pct, 2)
+            },
+            "telemetry_statistics": {
+                "total_recorded_sessions": result.total_charges,
+                "qualified_sessions": result.qualified_charges,
+                "odometer_km": result.odometer_max,
+                "annual_km_pace": round(result.annual_km, 0),
+                "dc_fast_charge_pct": result.dc_energy_pct,
+                "mean_temperature_celsius": result.mean_temperature
+            },
+            "forecast_scenarios": [
+                {
+                    "horizon": sm.horizon_label,
+                    "target_date": sm.target_date.strftime("%Y-%m-%d"),
+                    "projected_odometer_km": round(sm.projected_odometer, 0),
+                    "soh_optimistic_pct": sm.soh_optimistic,
+                    "soh_realistic_pct": sm.soh_realistic,
+                    "soh_severe_pct": sm.soh_severe
+                }
+                for sm in result.scenario_milestones
+            ]
+        }
+    finally:
+        if tmp_csv_path.exists():
+            tmp_csv_path.unlink()
+
+
+@app.get("/api/v1/vehicles", summary="Get EV Pack & Chemistry Catalog", tags=["Vehicle Catalog"])
+def api_get_vehicles():
+    """
+    Returns the comprehensive catalog of EV models, nominal pack capacities, and chemistry profiles.
+    """
+    return {
+        key: {
+            "make": p.make,
+            "model": p.model,
+            "variant": p.variant,
+            "nominal_usable_kwh": p.nominal_usable_kwh,
+            "gross_kwh": p.gross_kwh,
+            "chemistry": p.chemistry.code,
+            "typical_cycle_life": p.chemistry.typical_cycle_life_80,
+            "wltp_range_km": p.wltp_range_km
+        }
+        for key, p in VEHICLE_CATALOG.items()
+    }
+
+
+@app.get("/api/v1/verify", summary="Verify Certificate Token", tags=["Certificate Verification"])
+def api_verify_certificate(token: str):
+    """
+    Mathematically verifies the authenticity of a certificate URI or signature token.
+    """
+    return verify_certificate_token(token)
+
+
+# -------------------------------------------------------------
+# 3. ADMIN AUTHENTICATION & MANAGEMENT
 # -------------------------------------------------------------
 
 @app.get("/admin/login", response_class=HTMLResponse)
