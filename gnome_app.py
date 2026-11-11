@@ -467,7 +467,7 @@ class EvBatteryGnomeApp(Adw.Application):
         dialog.set_application_name("EV Battery SOH")
         dialog.set_application_icon("org.smilebob.EvBatterySoh")
         dialog.set_developer_name("Pierre Roth (smilebob)")
-        dialog.set_version("0.2.0")
+        dialog.set_version("0.3.0")
         dialog.set_copyright("© 2026 Pierre Roth")
         dialog.set_license_type(Gtk.License.BSD_3)
         dialog.set_website("https://github.com/smilebob/ev-battery-experts")

@@ -26,6 +26,11 @@
     <binary>ev-battery-soh-gui</binary>
   </provides>
   <releases>
+    <release version="0.3.0" date="2026-11-11">
+      <description>
+        <p>Lancement de l'application native GNOME (GTK4 &amp; Libadwaita), packaging Debian (.deb) et Flatpak (.flatpak), et nouvelle icône officielle squircle.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-10-27">
       <description>
         <p>Ajout de l'interface graphique native GNOME Libadwaita, support de l'API OpenAPI 3.1 et serveur MCP officiel.</p>

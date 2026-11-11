@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Build standalone Debian .deb package
 PKG_NAME="ev-battery-soh"
-VERSION="0.2.0"
+VERSION="0.3.0"
 ARCH="all"
 BUILD_DIR="dist/deb/${PKG_NAME}_${VERSION}_${ARCH}"
 
