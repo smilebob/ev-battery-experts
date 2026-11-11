@@ -38,7 +38,13 @@ It processes raw charging session logs without requiring proprietary cloud token
 9. **Native GNOME Desktop Application (`gnome_app.py`, `org.smilebob.EvBatterySoh.desktop`)**:
    - Modern GTK 4 and Libadwaita user interface adhering to GNOME Human Interface Guidelines (HIG).
    - Multi-step `Adw.ViewStack` navigation (CSV input -> Real-time LOWESS evaluation -> KPI cards -> One-click signed PDF & HTML export).
+   - Dedicated `Adw.AboutDialog` displaying BSD-3-Clause license, copyright, and developer credits.
+   - Dedicated AppStream metainfo (`data/org.smilebob.EvBatterySoh.metainfo.xml`) and GNOME squircle icons (SVG & PNG 16x16 to 512x512).
    - Callable via `ev-battery-soh --gui` or desktop launcher.
+10. **Debian & Flatpak Desktop Packaging (`scripts/build_deb.sh`, `flatpak/`)**:
+   - Build script producing official `ev-battery-soh_0.2.0_all.deb` with strict Debian standards.
+   - Flatpak manifest (`flatpak/org.smilebob.EvBatterySoh.yml`) adhering to Freedesktop SDK runtime standards.
+   - Automated release pipeline (`.github/workflows/release-artifacts.yml`) building Docker, `.deb`, and `.flatpak` simultaneously.
 
 ---
 

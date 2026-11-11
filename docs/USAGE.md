@@ -234,13 +234,41 @@ ev-battery-soh --gui
 python3 gnome_app.py
 ```
 
-### Features of the GNOME Application:
-* **Libadwaita Modern Design**: Uses `Adw.ApplicationWindow`, `Adw.ViewStack`, `Adw.PreferencesGroup`, and `Adw.ActionRow`.
-* **Step-by-Step Flow**:
-  1. **Données (Input)**: File chooser dialog for telemetry CSV, optional VIN entry, annual mileage override, forecast horizon (3 to 20 years), and report language.
-  2. **Résultats (Results)**: Responsive KPI cards (SOH %, Usable Capacity kWh, Sessions count, Mileage) with statistical error margins (95% CI).
-  3. **Direct Export Actions**: One-click export to official signed PDF certificate (ECDSA P-256 with QR-Code) and one-click opening of interactive Plotly HTML report in the system default browser.
-* **Desktop Integration**: Installs standard `.desktop` launcher under `~/.local/share/applications/org.smilebob.EvBatterySoh.desktop`.
+---
+
+## 📦 11. Packaging & Distribution (.deb & Flatpak)
+
+In addition to Python CLI and Docker containers, the application provides official Linux desktop packaging:
+
+### 1. Debian Package (`.deb`):
+Installs the binary wrappers, python packages, `.desktop` launcher, and hicolor icons for Debian, Ubuntu, and Linux Mint:
+```bash
+# Build the .deb locally:
+./scripts/build_deb.sh
+
+# Install:
+sudo dpkg -i dist/ev-battery-soh_0.2.0_all.deb
+sudo apt-get install -f  # resolve any missing runtime dependencies
+```
+
+### 2. Flatpak Bundle (`.flatpak`):
+Sandboxed application bundle adhering to Freedesktop and GNOME standards:
+* **Manifest**: [`flatpak/org.smilebob.EvBatterySoh.yml`](file:///home/pierre/Projets/SOH/flatpak/org.smilebob.EvBatterySoh.yml)
+* **Build command**:
+  ```bash
+  ./scripts/build_flatpak.sh
+  ```
+* **Install and run**:
+  ```bash
+  flatpak install --user dist/org.smilebob.EvBatterySoh.flatpak
+  flatpak run org.smilebob.EvBatterySoh
+  ```
+
+### 3. Automated CI/CD Releases:
+Whenever a new release is published on GitHub, the pipeline automatically compiles:
+* The multi-arch Docker image to **GHCR**.
+* The Debian `.deb` package attached directly to the GitHub release.
+* The standalone `.flatpak` bundle attached directly to the GitHub release.
 
 The project includes an automated GitHub Actions pipeline (`.github/workflows/docker-publish.yml`).
 

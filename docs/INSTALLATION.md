@@ -99,6 +99,26 @@ Access the web dashboard at `http://localhost:8000`.
 
 ---
 
+## 📦 Method 4: Debian (.deb) & Flatpak (.flatpak) Installation
+
+For desktop Linux users (GNOME, Debian, Ubuntu, Fedora, Arch):
+
+### A. Installing via Debian Package:
+Download the latest `ev-battery-soh_*.deb` from [Releases](https://github.com/smilebob/ev-battery-experts/releases):
+```bash
+sudo dpkg -i ev-battery-soh_0.2.0_all.deb
+sudo apt-get install -f
+```
+
+### B. Installing via Flatpak Bundle:
+Download `org.smilebob.EvBatterySoh.flatpak` from [Releases](https://github.com/smilebob/ev-battery-experts/releases):
+```bash
+flatpak install --user org.smilebob.EvBatterySoh.flatpak
+flatpak run org.smilebob.EvBatterySoh
+```
+
+---
+
 ## 🧪 Verifying Installation
 
 With the environment activated, check the CLI:

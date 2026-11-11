@@ -61,6 +61,14 @@ class EvBatteryGnomeWindow(Adw.ApplicationWindow):
         self.header_bar = Adw.HeaderBar()
         self.toolbar_view.add_top_bar(self.header_bar)
 
+        # Primary Menu Button for About / License
+        menu_button = Gtk.MenuButton()
+        menu_button.set_icon_name("open-menu-symbolic")
+        menu = Gio.Menu()
+        menu.append("À propos de EV Battery SOH", "app.about")
+        menu_button.set_menu_model(menu)
+        self.header_bar.pack_end(menu_button)
+
         # ViewStack for step navigation
         self.view_stack = Adw.ViewStack()
         self.toolbar_view.set_content(self.view_stack)
@@ -448,6 +456,28 @@ class EvBatteryGnomeApp(Adw.Application):
             application_id="org.smilebob.EvBatterySoh",
             flags=Gio.ApplicationFlags.FLAGS_NONE
         )
+
+        about_action = Gio.SimpleAction.new("about", None)
+        about_action.connect("activate", self._on_about_activated)
+        self.add_action(about_action)
+
+    def _on_about_activated(self, action, param):
+        win = self.props.active_window
+        dialog = Adw.AboutDialog()
+        dialog.set_application_name("EV Battery SOH")
+        dialog.set_application_icon("org.smilebob.EvBatterySoh")
+        dialog.set_developer_name("Pierre Roth (smilebob)")
+        dialog.set_version("0.2.0")
+        dialog.set_copyright("© 2026 Pierre Roth")
+        dialog.set_license_type(Gtk.License.BSD_3)
+        dialog.set_website("https://github.com/smilebob/ev-battery-experts")
+        dialog.set_issue_url("https://github.com/smilebob/ev-battery-experts/issues")
+        dialog.set_comments(
+            "Analyseur de dégradation et de santé de batterie (SOH) pour véhicules électriques.\n"
+            "Régression locale LOWESS (IC 95%), cinétique thermique d'Arrhenius, "
+            "projections multi-scénarios et certificats PDF signés par clé asymétrique ECDSA P-256."
+        )
+        dialog.present(win)
 
     def do_activate(self):
         win = self.props.active_window

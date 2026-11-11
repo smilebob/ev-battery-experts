@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.smilebob.EvBatterySoh</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <name>EV Battery SOH</name>
+  <summary>State of Health analyzer, electrochemical degradation forecaster &amp; certified inspector for electric vehicles</summary>
+  <description>
+    <p>
+      EV Battery SOH is a telemetric battery health assessment suite for electric vehicles (Tesla, Stellantis, Renault, VW Group, MG, Hyundai, Kia, etc.).
+    </p>
+    <p>
+      It models capacity degradation using non-parametric Gaussian local regression (LOWESS) with 95% confidence intervals, captures Arrhenius thermal wear kinetics and DC fast-charging severity, projects future degradation scenarios (Optimistic, Realistic, Severe), and generates tamper-evident, cryptographically signed PDF inspection certificates with offline QR verification.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.smilebob.EvBatterySoh.desktop</launchable>
+  <url type="homepage">https://github.com/smilebob/ev-battery-experts</url>
+  <url type="bugtracker">https://github.com/smilebob/ev-battery-experts/issues</url>
+  <developer_name>Pierre Roth</developer_name>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Analyse de dégradation et indicateurs de santé SOH</caption>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <binary>ev-battery-soh-gui</binary>
+  </provides>
+  <releases>
+    <release version="0.2.0" date="2026-10-27">
+      <description>
+        <p>Ajout de l'interface graphique native GNOME Libadwaita, support de l'API OpenAPI 3.1 et serveur MCP officiel.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

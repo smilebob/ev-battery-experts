@@ -1,0 +1,45 @@
+app-id: org.smilebob.EvBatterySoh
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: ev-battery-soh-gui
+
+finish-args:
+  # X11 and Wayland rendering
+  - --socket=fallback-x11
+  - --socket=wayland
+  # Audio / Video / Graphics acceleration
+  - --device=dri
+  # File access to read CSV logs and save PDF reports
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+  - --filesystem=home:ro
+  # IPC communication
+  - --share=ipc
+
+build-options:
+  env:
+    PYTHONUSERBASE: /app
+
+modules:
+  - name: python3-dependencies
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}" --prefix=/app -r requirements.txt
+    sources:
+      - type: file
+        path: requirements.txt
+
+  - name: ev-battery-soh
+    buildsystem: simple
+    build-commands:
+      # Install python package to /app
+      - pip3 install --no-deps --prefix=/app .
+      # Install desktop file, icons, and metainfo
+      - install -Dm644 org.smilebob.EvBatterySoh.desktop /app/share/applications/org.smilebob.EvBatterySoh.desktop
+      - install -Dm644 data/org.smilebob.EvBatterySoh.metainfo.xml /app/share/metainfo/org.smilebob.EvBatterySoh.metainfo.xml
+      - install -Dm644 data/icons/org.smilebob.EvBatterySoh.svg /app/share/icons/hicolor/scalable/apps/org.smilebob.EvBatterySoh.svg
+      - for s in 16 24 32 48 64 128 256 512; do install -Dm644 data/icons/${s}x${s}/org.smilebob.EvBatterySoh.png /app/share/icons/hicolor/${s}x${s}/apps/org.smilebob.EvBatterySoh.png; done
+    sources:
+      - type: dir
+        path: .

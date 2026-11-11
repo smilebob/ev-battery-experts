@@ -1,10 +1,11 @@
 [Desktop Entry]
 Name=EV Battery SOH
+GenericName=Battery Health Analyzer
 Comment=Electric Vehicle Battery State of Health Analyzer & Certifier
-Exec=python3 /home/pierre/Projets/SOH/gnome_app.py
-Icon=battery-profile-symbolic
+Exec=ev-battery-soh-gui
+Icon=org.smilebob.EvBatterySoh
 Terminal=false
 Type=Application
 Categories=Utility;Engineering;GTK;
-Keywords=battery;ev;electric;vehicle;soh;tesla;charging;telemetry;
+Keywords=battery;ev;electric;vehicle;soh;tesla;charging;telemetry;inspection;lfp;nmc;
 StartupNotify=true

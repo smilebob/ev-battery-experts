@@ -1,0 +1,17 @@
+Source: ev-battery-soh
+Section: utils
+Priority: optional
+Maintainer: Pierre Roth <pierre.roth@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3-all, python3-setuptools
+Standards-Version: 4.6.2
+Homepage: https://github.com/smilebob/ev-battery-experts
+
+Package: ev-battery-soh
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, python3-pandas, python3-numpy, python3-scipy, python3-reportlab, python3-cryptography, python3-qrcode, python3-jinja2
+Description: Electric vehicle battery state of health analyzer and certified inspector
+ Advanced telemetric battery capacity and State of Health (SOH) analyzer for electric vehicles.
+ Calculates usable capacity trajectories using Gaussian local regression (LOWESS) with 95%
+ confidence bands, Arrhenius thermal wear kinetics, and generates tamper-evident,
+ cryptographically signed PDF inspection certificates.
+ Includes CLI tool and native GNOME GTK4 Libadwaita desktop application.

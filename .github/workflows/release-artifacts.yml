@@ -1,4 +1,4 @@
-name: Build and Publish Multi-Arch Docker Image
+name: Build & Release Artifacts (Docker, Debian .deb, Flatpak)
 
 on:
   release:
@@ -10,7 +10,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  docker-build:
+    name: Build & Publish Multi-Arch Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,3 +57,53 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deb-package:
+    name: Build Debian .deb Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+
+      - name: Build Debian Package
+        run: |
+          chmod +x scripts/build_deb.sh
+          ./scripts/build_deb.sh
+
+      - name: Upload Debian Package to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+
+  flatpak-package:
+    name: Build Flatpak Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: org.smilebob.EvBatterySoh.flatpak
+          manifest-path: flatpak/org.smilebob.EvBatterySoh.yml
+          cache: false
+
+      - name: Upload Flatpak Bundle to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: org.smilebob.EvBatterySoh.flatpak
