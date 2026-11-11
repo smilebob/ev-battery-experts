@@ -35,3 +35,7 @@ rapport_soh.html
 .idea/
 .vscode/
 *.swp
+.flatpak-builder/
+.flatpak_build/
+.flatpak-builder/
+.flatpak_build/

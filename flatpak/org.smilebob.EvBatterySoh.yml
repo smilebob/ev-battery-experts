@@ -3,43 +3,215 @@ runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
 command: ev-battery-soh-gui
-
 finish-args:
-  # X11 and Wayland rendering
-  - --socket=fallback-x11
-  - --socket=wayland
-  # Audio / Video / Graphics acceleration
-  - --device=dri
-  # File access to read CSV logs and save PDF reports
-  - --filesystem=xdg-documents
-  - --filesystem=xdg-download
-  - --filesystem=home:ro
-  # IPC communication
-  - --share=ipc
-
+- --socket=fallback-x11
+- --socket=wayland
+- --device=dri
+- --filesystem=xdg-documents
+- --filesystem=xdg-download
+- --filesystem=home:ro
+- --share=ipc
 build-options:
   env:
     PYTHONUSERBASE: /app
-
 modules:
-  - name: python3-dependencies
-    buildsystem: simple
-    build-commands:
-      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}" --prefix=/app -r requirements.txt
-    sources:
-      - type: file
-        path: requirements.txt
-
-  - name: ev-battery-soh
-    buildsystem: simple
-    build-commands:
-      # Install python package to /app
-      - pip3 install --no-deps --prefix=/app .
-      # Install desktop file, icons, and metainfo
-      - install -Dm644 org.smilebob.EvBatterySoh.desktop /app/share/applications/org.smilebob.EvBatterySoh.desktop
-      - install -Dm644 data/org.smilebob.EvBatterySoh.metainfo.xml /app/share/metainfo/org.smilebob.EvBatterySoh.metainfo.xml
-      - install -Dm644 data/icons/org.smilebob.EvBatterySoh.svg /app/share/icons/hicolor/scalable/apps/org.smilebob.EvBatterySoh.svg
-      - for s in 16 24 32 48 64 128 256 512; do install -Dm644 data/icons/${s}x${s}/org.smilebob.EvBatterySoh.png /app/share/icons/hicolor/${s}x${s}/apps/org.smilebob.EvBatterySoh.png; done
-    sources:
-      - type: dir
-        path: .
+- name: python3-numpy
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "numpy" --no-build-isolation
+  sources:
+  - &id001
+    type: file
+    url: https://files.pythonhosted.org/packages/da/24/3bd070f3269dc609d8f26b2643f62ef91bb415841c0b294805aaf7fe06da/numpy-2.5.4-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+    sha256: 6ffa07666f8da0eef81d149934a626d0d95fbd6838432a33e66245423a9062c0
+    only-arches:
+    - x86_64
+  - &id002
+    type: file
+    url: https://files.pythonhosted.org/packages/db/b6/135bb0953b61dc21c6cafa14b424ae666944e4899cf140e00c2b322a1a45/numpy-2.5.4-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl
+    sha256: 1c2e71b04c6cad90026e544501bbe0ab9290fa8a4d845e7e8c0d124fb429c988
+    only-arches:
+    - aarch64
+- name: python3-pandas
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "pandas" --no-build-isolation
+  sources:
+  - *id001
+  - *id002
+  - type: file
+    url: https://files.pythonhosted.org/packages/79/c2/c8bc972d6dcba13910fc92b622420704a2f655dd6b01ed54269a1bf7c2d2/pandas-3.1.1-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+    sha256: 645fa00fd85cfced2d2c09dc116d3694f578501b1ce4899153fbe64788ecda98
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://files.pythonhosted.org/packages/49/f7/5c2c9b7b3e3d08a8bc7f40e4e066d395d388c7b08b3788e6149a32e2f37a/pandas-3.1.1-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl
+    sha256: 57112bab44e336758121435cd01ccebc1e4fca56c28d95d7c03bf2418dedea6a
+    only-arches:
+    - aarch64
+  - &id003
+    type: file
+    url: https://files.pythonhosted.org/packages/2f/a9/52b89563d154433d79b51ed1eb4842bf7334cb2696891a7fe135618853d7/python_dateutil-4.0.0-py3-none-any.whl
+    sha256: a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c
+  - &id004
+    type: file
+    url: https://files.pythonhosted.org/packages/0a/66/9a06c2227fedfd4919f0eaaa8b94377d9730882a7e4f95823c9a331ab5e1/tzdata-2026.6-py2.py3-none-any.whl
+    sha256: 0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec
+- name: python3-plotly
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "plotly" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/cf/82/8ef9c7e0f50493307a49c09cfa7f00c5a778b6d1921f7b2dabe1d3a5809e/narwhals-2.28.0-py3-none-any.whl
+    sha256: 1f69d6385ec30e2fa6e1fdeb37c562ecabd0f713f6f3e3b58a668c5c9df9567f
+  - type: file
+    url: https://files.pythonhosted.org/packages/e5/7d/905a3a3d51087515719058c94cfbda2ff0fc14417c20d557ae3e82d8b250/plotly-7.1.0-py3-none-any.whl
+    sha256: dbb7fa18afce40d0a8e80d1bf162eceb3faa0ce5a77fe741ad09a74cf78f53f3
+- name: python3-jinja2
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "jinja2" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+    sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+  - type: file
+    url: https://files.pythonhosted.org/packages/63/e0/cec6865dfe88cb48fedd4b20aed6af5158e41092adcbf3e028bcc6ec2108/markupsafe-3.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+    sha256: 434139499bb20b502ed3baa1f169e618f924a97e7a777fea1a49446d80106cf6
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://files.pythonhosted.org/packages/f3/a5/28b76a7449eb702966b88bef599e2360b411fbb3afeee8fe560939be06ec/markupsafe-3.0.4-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
+    sha256: 7018d4af1cd272e847aa5917983ab5e83e4f6579f9dbfecd4a79c0ca80b144c2
+    only-arches:
+    - aarch64
+- name: python3-cryptography
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "cryptography" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/95/95/86342356ff5953b3fb06f7ef7c5bee212d45e770abc7218d451b9148313c/cffi-2.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+    sha256: a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://files.pythonhosted.org/packages/37/6f/3b5ce4c3b2192d250f04908f2bfd91ef34552ec8f7716a5d4abdb8d67bb2/cffi-2.1.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl
+    sha256: f16c709686a78c727bbbf059f92b0bf41c6fc60deec706d2dc19f529175a6125
+    only-arches:
+    - aarch64
+  - type: file
+    url: https://files.pythonhosted.org/packages/21/69/64cef1f702bf6657e0cc186ed1a2891d50d29fb41586b254e1c07adea261/cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+    sha256: 630ebfea3bf689d075f82316324ff7433dc447fe6bc1bfc76524b74b4a9567d2
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://files.pythonhosted.org/packages/d9/69/c9bd862c3bf43d6399c433caf002df16e2dffd4be49bdf515cda38038711/cryptography-50.0.2-cp311-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl
+    sha256: 79def8d059362e7831389ed3be0ecdf58a89386e1271e35dd9f5af84e81bffd0
+    only-arches:
+    - aarch64
+  - type: file
+    url: https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl
+    sha256: a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e
+- name: python3-qrcode
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "qrcode" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/dd/b8/d2d6d731733f51684bbf76bf34dab3b70a9148e8f2cef2bb544fccec681a/qrcode-8.2-py3-none-any.whl
+    sha256: 16e64e0716c14960108e85d853062c9e8bba5ca8252c0b4d0231b9df4060ff4f
+- name: python3-reportlab
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "reportlab" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/fc/ad/d07d7862a62ffa6d79d68074d14823243dd235a77c45262acbf6adeb28bf/charset_normalizer-3.5.2-py3-none-any.whl
+    sha256: b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685
+  - type: file
+    url: https://files.pythonhosted.org/packages/ef/fe/f5cdaa2d1c4086e757430f368c271a58ee29cfe7378e7ae7b9d964015c25/pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+    sha256: 5f56499c1a74d2b862beb0c33b8016f99d095858455df9d21583bbbc1c15b582
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://files.pythonhosted.org/packages/fb/3c/cd0770e96d20bfd990db024bcbd43897ff3e88da1f4782cf90ea231b1d4f/pillow-13.0.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl
+    sha256: 19b66ca0a4d25cc0200b381ce824c7ea090db61427315e73cfb05dbf1b35c369
+    only-arches:
+    - aarch64
+  - type: file
+    url: https://files.pythonhosted.org/packages/4a/3c/bf68d44f160b44685fc714f746a954c71d0091b3dc4fd3c8670154b44841/reportlab-5.1.0-py3-none-any.whl
+    sha256: 59fdbaec5efe437095ad1d7292ec9a271c8ca2d3ec75e889c6e61400929b90df
+- name: python3-python-dateutil
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "python-dateutil" --no-build-isolation
+  sources:
+  - *id003
+  - *id004
+- name: python3-hatchling
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "hatchling" --no-build-isolation
+  sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/32/64/4afe5dd77b2939a93e8c9513f8082dbd049ecba9c1484a379a0f6ae29d6b/hatchling-1.33.0-py3-none-any.whl
+    sha256: 415290b84f464d2884303fca8974d38e7b85579069fab02a15db0828fbb1446d
+  - &id005
+    type: file
+    url: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
+    sha256: a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189
+  - &id006
+    type: file
+    url: https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl
+    sha256: 7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec
+  - type: file
+    url: https://files.pythonhosted.org/packages/da/46/7d84138a60a8bd796825b2d38ebe92d0d16501ca57d501b7c5d677401bbc/tomlkit-0.15.2-py3-none-any.whl
+    sha256: 05562412163a3037b94497385fb7f9204c637bc605af7a48199e41cf2272f437
+  - &id007
+    type: file
+    url: https://files.pythonhosted.org/packages/30/81/0da8afb52a71d0a4f2bd3152357b1a441e393b286374802b9d3addab4ab5/trove_classifiers-2026.9.21.13-py3-none-any.whl
+    sha256: 8b1ff4f9c191b1040b71c37f1e445ab99732911e3cd91de52838453a854d7a17
+- name: python3-pathspec
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "pathspec" --no-build-isolation
+  sources:
+  - *id005
+- name: python3-pluggy
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "pluggy" --no-build-isolation
+  sources:
+  - *id006
+- name: python3-trove-classifiers
+  buildsystem: simple
+  build-commands:
+  - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+    --prefix=${FLATPAK_DEST} "trove-classifiers" --no-build-isolation
+  sources:
+  - *id007
+- name: ev-battery-soh
+  buildsystem: simple
+  build-commands:
+  - pip3 install --no-build-isolation --no-deps --prefix=/app .
+  - install -Dm644 org.smilebob.EvBatterySoh.desktop /app/share/applications/org.smilebob.EvBatterySoh.desktop
+  - install -Dm644 data/org.smilebob.EvBatterySoh.metainfo.xml /app/share/metainfo/org.smilebob.EvBatterySoh.metainfo.xml
+  - install -Dm644 data/icons/org.smilebob.EvBatterySoh.svg /app/share/icons/hicolor/scalable/apps/org.smilebob.EvBatterySoh.svg
+  - for s in 16 24 32 48 64 128 256 512; do install -Dm644 data/icons/${s}x${s}/org.smilebob.EvBatterySoh.png
+    /app/share/icons/hicolor/${s}x${s}/apps/org.smilebob.EvBatterySoh.png; done
+  sources:
+  - type: dir
+    path: ..

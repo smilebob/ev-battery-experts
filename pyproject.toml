@@ -7,7 +7,7 @@ authors = [
     { name = "smilebob", email = "pierre.roth@gmail.com" }
 ]
 license = { text = "BSD-3-Clause" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "bcrypt>=4.0.0",
     "cryptography>=41.0.0",
