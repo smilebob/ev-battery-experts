@@ -64,6 +64,7 @@ ev-battery-soh "/path/to/charges.csv" --lang es -o informe.html
 
 ## ⚙️ CLI Arguments
 
+* `--gui`: Launch the native GNOME / GTK4 Libadwaita desktop graphical interface.
 * `-o`, `--output`: Output HTML report filepath (default: `battery_soh_report.html`).
 * `-l`, `--lang`: Report language: `en`, `fr`, or `es` (default: `en`).
 * `--vin`: Vehicle Identification Number (VIN - 17 alphanumeric characters, ISO 3779 standard).

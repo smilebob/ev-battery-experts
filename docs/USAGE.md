@@ -207,7 +207,40 @@ You can deploy `ev-battery-soh` directly as a **Portainer Stack**:
 
 ---
 
+---
+
 ## 🏗️ 9. Automated CI/CD & Multi-Arch Docker Builds
+
+The project includes an automated GitHub Actions pipeline (`.github/workflows/docker-publish.yml`).
+
+* **Trigger**: Automatically executes whenever a new Release is published on GitHub (or manually via *workflow_dispatch*).
+* **Multi-Architecture**: Compiles and pushes dual architecture images (`linux/amd64` and `linux/arm64`) using Docker Buildx and QEMU.
+* **Registry**: Published automatically to GitHub Container Registry:
+  `ghcr.io/smilebob/ev-battery-experts:latest` and tagged release versions (e.g., `:v0.1.0`).
+
+---
+
+## 🖥️ 10. Native GNOME Application (GTK4 & Libadwaita)
+
+The platform includes a native desktop GNOME application adhering to the GNOME Human Interface Guidelines (HIG):
+
+### Launching the GNOME Interface:
+You can launch it via CLI or directly from your GNOME Applications overview:
+```bash
+# Via flag on main binary:
+ev-battery-soh --gui
+
+# Or standalone GUI command:
+python3 gnome_app.py
+```
+
+### Features of the GNOME Application:
+* **Libadwaita Modern Design**: Uses `Adw.ApplicationWindow`, `Adw.ViewStack`, `Adw.PreferencesGroup`, and `Adw.ActionRow`.
+* **Step-by-Step Flow**:
+  1. **Données (Input)**: File chooser dialog for telemetry CSV, optional VIN entry, annual mileage override, forecast horizon (3 to 20 years), and report language.
+  2. **Résultats (Results)**: Responsive KPI cards (SOH %, Usable Capacity kWh, Sessions count, Mileage) with statistical error margins (95% CI).
+  3. **Direct Export Actions**: One-click export to official signed PDF certificate (ECDSA P-256 with QR-Code) and one-click opening of interactive Plotly HTML report in the system default browser.
+* **Desktop Integration**: Installs standard `.desktop` launcher under `~/.local/share/applications/org.smilebob.EvBatterySoh.desktop`.
 
 The project includes an automated GitHub Actions pipeline (`.github/workflows/docker-publish.yml`).
 

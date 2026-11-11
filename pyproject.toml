@@ -28,6 +28,7 @@ dependencies = [
 
 [project.scripts]
 ev-battery-soh = "main:main"
+ev-battery-soh-gui = "gnome_app:main"
 
 [build-system]
 requires = ["hatchling"]

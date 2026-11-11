@@ -35,8 +35,10 @@ It processes raw charging session logs without requiring proprietary cloud token
    - FastAPI server with OpenAPI 3.1 specifications (`/docs`, `/redoc`, `/openapi.json`).
    - Multi-user authentication with bcrypt password hashing (12 rounds) and JWT HS256 sessions.
    - Dynamic runtime tuning of physical parameters and ECDSA key management.
-8. **Automated Docker & Portainer CI/CD (`.github/workflows/docker-publish.yml`, `portainer-stack.yml`)**:
-   - Dual-architecture automated builds (`linux/amd64`, `linux/arm64`) published to GitHub Container Registry (`ghcr.io/smilebob/ev-battery-experts:latest` and `:v0.1.0`).
+9. **Native GNOME Desktop Application (`gnome_app.py`, `org.smilebob.EvBatterySoh.desktop`)**:
+   - Modern GTK 4 and Libadwaita user interface adhering to GNOME Human Interface Guidelines (HIG).
+   - Multi-step `Adw.ViewStack` navigation (CSV input -> Real-time LOWESS evaluation -> KPI cards -> One-click signed PDF & HTML export).
+   - Callable via `ev-battery-soh --gui` or desktop launcher.
 
 ---
 

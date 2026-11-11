@@ -102,6 +102,11 @@ def main():
         help="Vehicle Identification Number (VIN - 17 alphanumeric characters, ISO 3779)",
     )
     parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch the native GNOME / GTK4 Libadwaita graphical interface",
+    )
+    parser.add_argument(
         "--mapping",
         "-m",
         nargs="*",
@@ -109,6 +114,15 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # GUI mode shortcut
+    if args.gui:
+        try:
+            from gnome_app import main as gnome_main
+            sys.exit(gnome_main())
+        except Exception as e:
+            print(f"Error launching GNOME GUI: {e}", file=sys.stderr)
+            sys.exit(1)
 
     # Verification mode shortcut
     if args.verify_token:
