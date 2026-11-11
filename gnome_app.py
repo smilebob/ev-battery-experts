@@ -120,7 +120,7 @@ class EvBatteryGnomeWindow(Adw.ApplicationWindow):
 
         # Preferences Group: Vehicle & Forecast Parameters
         grp_params = Adw.PreferencesGroup()
-        grp_params.set_title("Paramètres du Véhicule & Prévisions")
+        grp_params.set_title("Paramètres du Véhicule &amp; Prévisions")
         box.append(grp_params)
 
         # VIN Entry Row
