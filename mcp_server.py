@@ -115,6 +115,7 @@ def generate_inspection_certificate(
     output_pdf_path: str,
     vin: Optional[str] = None,
     lang: str = "fr",
+    min_delta: float = 40.0,
     private_key_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -126,13 +127,14 @@ def generate_inspection_certificate(
         output_pdf_path: Output file path for the signed PDF certificate.
         vin: Optional 17-character Vehicle Identification Number.
         lang: Language of the certificate ('fr', 'en', 'es').
+        min_delta: Minimum SoC variation % to admit charge session into model (default 40.0).
         private_key_path: Optional path to custom ECDSA private key PEM file.
     """
     path = Path(csv_path)
     if not path.exists():
         return {"error": f"File '{csv_path}' does not exist."}
 
-    analyzer = SOHAnalyzer(lang=lang, vin=vin)
+    analyzer = SOHAnalyzer(min_delta_soc=min_delta, lang=lang, vin=vin)
     clean_df = analyzer.load_data(path)
     result = analyzer.analyze(clean_df)
 

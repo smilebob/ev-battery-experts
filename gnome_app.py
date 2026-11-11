@@ -156,6 +156,13 @@ class EvBatteryGnomeWindow(Adw.ApplicationWindow):
         self.combo_lang.set_model(lang_model)
         grp_params.add(self.combo_lang)
 
+        # Min Delta SoC SpinRow
+        self.spin_min_delta = Adw.SpinRow.new_with_range(10.0, 90.0, 5.0)
+        self.spin_min_delta.set_title("Variation Minimale de Charge (Δ% SoC)")
+        self.spin_min_delta.set_subtitle("Filtre le bruit d'arrondi numérique du BMS (Défaut : 40 %)")
+        self.spin_min_delta.set_value(40.0)
+        grp_params.add(self.spin_min_delta)
+
         # Action Button: Run Analysis
         self.btn_analyze = Gtk.Button(label="Lancer l'Analyse Télémétrique")
         self.btn_analyze.add_css_class("suggested-action")
@@ -227,9 +234,12 @@ class EvBatteryGnomeWindow(Adw.ApplicationWindow):
         lang_map = ["fr", "en", "es"]
         lang = lang_map[lang_idx]
 
+        min_delta = float(self.spin_min_delta.get_value())
+
         def worker():
             try:
                 analyzer = SOHAnalyzer(
+                    min_delta_soc=min_delta,
                     lang=lang,
                     annual_km=annual_km,
                     forecast_years=forecast_years,

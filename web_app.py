@@ -83,10 +83,13 @@ async def process_analysis(
     vin: Optional[str] = Form(None),
     lang: str = Form("fr"),
     annual_km: Optional[float] = Form(None),
-    forecast_years: int = Form(3)
+    forecast_years: int = Form(3),
+    min_delta: Optional[float] = Form(None)
 ):
     with Session(engine) as session:
         cfg = session.get(AppConfig, 1) or AppConfig()
+
+    effective_min_delta = min_delta if (min_delta is not None and min_delta > 0) else cfg.min_delta_soc
 
     # Save uploaded CSV into a secure temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
@@ -95,7 +98,7 @@ async def process_analysis(
 
     try:
         analyzer = SOHAnalyzer(
-            min_delta_soc=cfg.min_delta_soc,
+            min_delta_soc=effective_min_delta,
             lang=lang,
             annual_km=annual_km,
             forecast_years=forecast_years,
@@ -175,7 +178,8 @@ async def api_analyze_battery(
     vin: Optional[str] = Form(None, description="Optional 17-character VIN"),
     lang: str = Form("en", description="Language: 'en', 'fr', 'es'"),
     annual_km: Optional[float] = Form(None, description="Projected annual mileage in km"),
-    forecast_years: int = Form(3, description="Degradation projection horizon in years")
+    forecast_years: int = Form(3, description="Degradation projection horizon in years"),
+    min_delta: Optional[float] = Form(None, description="Minimum SoC variation % (default 40.0, or configured system default)")
 ):
     """
     Ingests charging logs, fits Gaussian LOWESS curves, and returns structured SOH metrics,
@@ -184,13 +188,15 @@ async def api_analyze_battery(
     with Session(engine) as session:
         cfg = session.get(AppConfig, 1) or AppConfig()
 
+    effective_min_delta = min_delta if (min_delta is not None and min_delta > 0) else cfg.min_delta_soc
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
         shutil.copyfileobj(file.file, tmp_csv)
         tmp_csv_path = Path(tmp_csv.name)
 
     try:
         analyzer = SOHAnalyzer(
-            min_delta_soc=cfg.min_delta_soc,
+            min_delta_soc=effective_min_delta,
             lang=lang,
             annual_km=annual_km,
             forecast_years=forecast_years,
